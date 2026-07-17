@@ -5,7 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 BALANCE_FILE = "balances.json"
-START_BALANCE = 100
+START_BALANCE = 1000
 
 # Загружаем данные из файла при старте
 if os.path.exists(BALANCE_FILE):
