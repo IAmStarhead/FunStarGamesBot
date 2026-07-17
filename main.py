@@ -3,21 +3,25 @@ import threading
 import logging
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update
-from telegram.ext import Application, CommandHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+
+# Импортируем обработчики из новой папки
+from handlers.start import start_command, hello_handler, button_handler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # --- Бот ---
-async def start(update: Update, context):
-    user = update.effective_user.first_name
-    await update.message.reply_text(f'Привет, {user}! FunStarGames работает 🎲')
-    logger.info(f'Пользователь {user} написал /start')
-
 def run_bot():
     token = os.environ['BOT_TOKEN']
     app = Application.builder().token(token).build()
-    app.add_handler(CommandHandler('start', start))
+
+    # Регистрируем обработчики
+    app.add_handler(CommandHandler('start', start_command))
+    app.add_handler(CommandHandler('help', button_handler))  # /help тоже будет работать
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex(r'(?i)^(привет|здравствуй|хай|здарова|hello)$'), hello_handler))
+    app.add_handler(CallbackQueryHandler(button_handler))  # обрабатывает нажатия на все инлайн-кнопки
+
     logger.info('Запускаю бота...')
     app.run_polling()
 
@@ -29,7 +33,7 @@ class PingHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b'OK')
     def log_message(self, format, *args):
-        pass  # отключаем логи запросов
+        pass
 
 def run_web():
     port = int(os.environ.get('PORT', 10000))
