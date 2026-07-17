@@ -1,6 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from handlers import blackjack, durak
+from handlers import blackjack, durak, slots
 
 WELCOME_TEXT = (
     "🚀 Приветствую, {name}!\n\n"
@@ -111,6 +111,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Покер пока в разработке. Скоро!")
     elif data == "durak":
         await query.answer()
+    elif data == "slots":
+        await query.answer("Запускаю слоты!")
+        await slots.start_slots(update, context)
         # Показываем выбор режима
         keyboard = [
             [InlineKeyboardButton("Подкидной", callback_data="durak_mode_throw")],
