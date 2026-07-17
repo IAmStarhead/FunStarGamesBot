@@ -7,9 +7,7 @@ from wallet import get_balance, add_balance
 
 logger = logging.getLogger(__name__)
 
-# Символы слотов (6 видов)
 SYMBOLS = ['7️⃣', '🍒', '🍋', '🍊', '🍇', '🔔']
-# Таблица выплат (множитель ставки)
 PAYOUTS = {
     '7️⃣': 100,
     '🍒': 20,
@@ -30,9 +28,9 @@ def format_slots(grid):
 
 def check_win(grid):
     """Проверяет центральную линию (второй ряд) на выигрыш."""
-    line = grid[1]  # центральная строка
-    if len(set(line)) == 1:  # все три одинаковые
-        return line[0]  # символ
+    line = grid[1]
+    if len(set(line)) == 1:
+        return line[0]
     return None
 
 async def start_slots(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -41,7 +39,6 @@ async def start_slots(update: Update, context: ContextTypes.DEFAULT_TYPE):
     thread_id = update.effective_message.message_thread_id if update.effective_message else None
     user = update.effective_user
 
-    # Начальные параметры
     bet = 10
     balance = get_balance(user.id)
     grid = spin_result()
@@ -69,7 +66,6 @@ async def start_slots(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message_thread_id=thread_id
     )
 
-    # Сохраняем состояние в user_data (чтобы не заводить глобальный словарь)
     context.user_data['slots'] = {
         'message_id': msg.message_id,
         'chat_id': chat.id,
@@ -97,9 +93,8 @@ async def slots_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_bet = int(data.split('_')[2])
         slots_state['bet'] = new_bet
         await query.answer(f'Ставка изменена на {new_bet} фишек.')
-        # Обновляем сообщение (без анимации)
         balance = get_balance(user.id)
-        grid = spin_result()  # Можно не менять картинку, но для отзывчивости поменяем
+        grid = spin_result()
         keyboard = [
             [InlineKeyboardButton('10', callback_data='slots_bet_10'),
              InlineKeyboardButton('25', callback_data='slots_bet_25'),
@@ -131,27 +126,19 @@ async def slots_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Списываем ставку
         add_balance(user.id, -bet)
-        balance = get_balance(user.id)  # обновлённый баланс
+        balance = get_balance(user.id)
 
-        # Анимация: 5 промежуточных случайных сеток
-        for _ in range(5):
-            grid = spin_result()
-            # Во время анимации меняем заголовок
-            anim_text = (
-                f"🎰 Крутим... 🎰\n"
-                f"──────────────\n"
-                f"{format_slots(grid)}\n"
-                f"──────────────\n"
-                f"Ставка: {bet} фишек\n"
-                f"Баланс: {balance} фишек"
-            )
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=message_id,
-                text=anim_text,
-                reply_markup=None  # на время анимации убираем кнопки
-            )
-            await asyncio.sleep(0.4)
+        # Удаляем исходное сообщение
+        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+
+        # Отправляем заставку с эмодзи автомата
+        splash_msg = await context.bot.send_message(
+            chat_id=chat_id,
+            text="🎰 Крутим... 🎰",
+            message_thread_id=thread_id
+        )
+        await asyncio.sleep(2)  # Имитация вращения
+        await context.bot.delete_message(chat_id=chat_id, message_id=splash_msg.message_id)
 
         # Финальный результат
         final_grid = spin_result()
@@ -183,16 +170,17 @@ async def slots_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Баланс: {new_balance} фишек"
         )
 
-        await context.bot.edit_message_text(
+        msg = await context.bot.send_message(
             chat_id=chat_id,
-            message_id=message_id,
             text=final_text,
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            message_thread_id=thread_id
         )
-        # Обновляем баланс в состоянии (на случай, если не перезашёл)
-        slots_state['bet'] = bet  # оставляем текущую ставку
+
+        # Обновляем состояние, чтобы кнопки работали для нового сообщения
+        slots_state['message_id'] = msg.message_id
+        slots_state['bet'] = bet
         return
 
 def register_handlers(app):
-    """Регистрирует обработчики слотов."""
     app.add_handler(CallbackQueryHandler(slots_button, pattern='^slots_(bet_|spin)'))
