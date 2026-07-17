@@ -5,20 +5,14 @@ from aiohttp import web
 from telegram import Update
 from telegram.ext import Application, CommandHandler
 
-# Настройка подробного логирования
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Обработчик команды /start
 async def start(update: Update, context):
     user = update.effective_user.first_name
     await update.message.reply_text(f'Привет, {user}! FunStarGames работает 🎲')
     logger.info(f'Пользователь {user} запустил бота')
 
-# Веб-заглушка для Render и UptimeRobot
 async def handle(request):
     return web.Response(text="OK")
 
@@ -34,17 +28,15 @@ async def run_web_server():
 
 async def main():
     token = os.environ['BOT_TOKEN']
-    logger.info('Создаю приложение бота...')
     application = Application.builder().token(token).build()
     application.add_handler(CommandHandler('start', start))
 
-    await run_web_server()
-    logger.info('Бот инициализирован, запускаю поллинг...')
-    await application.initialize()
-    await application.start()
-    logger.info('Бот запущен и слушает сообщения!')
-    # Бесконечное ожидание, чтобы сервис не завершился
-    await asyncio.Event().wait()
+    # Веб-сервер для обхода сна Render
+    asyncio.create_task(run_web_server())
+
+    # Запуск поллинга (основной цикл бота)
+    logger.info('Запускаю поллинг...')
+    await application.run_polling()
 
 if __name__ == '__main__':
     asyncio.run(main())
