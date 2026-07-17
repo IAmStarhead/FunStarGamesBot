@@ -13,7 +13,7 @@ from telegram.ext import (
 )
 
 from handlers.start import start_command, hello_handler, button_handler
-from handlers import blackjack, durak
+from handlers import blackjack, durak, slots
 from wallet import get_balance, transfer, get_user_id_by_username, update_username
 
 logging.basicConfig(
@@ -98,6 +98,15 @@ def run_bot():
         MessageHandler(
             filters.TEXT & filters.Regex(r"(?i)^дурак"),
             durak.text_durak
+        )
+    )
+
+    slots.register_handlers(app)
+    app.add_handler(CommandHandler("slots", slots.start_slots))
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & filters.Regex(r"(?i)^(слоты|слот|автомат)$"),
+            slots.start_slots
         )
     )
 
