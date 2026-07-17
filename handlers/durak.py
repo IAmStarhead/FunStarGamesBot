@@ -7,7 +7,6 @@ from wallet import get_balance, add_balance
 
 logger = logging.getLogger(__name__)
 
-# Хранилище игр: ключ — chat_id
 durak_games = {}
 
 SUITS = ['♠', '♥', '♦', '♣']
@@ -102,8 +101,7 @@ async def update_lobby_message(chat_id, context):
         chat_id=chat_id,
         message_id=game['message_id'],
         text=f'🃏 Дурак ({mode_names[game["mode"]]})\n{bet_text}\nТекущие игроки: {names}',
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        message_thread_id=game.get('thread_id')
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 async def durak_lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
