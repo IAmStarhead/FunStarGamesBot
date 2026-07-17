@@ -65,9 +65,7 @@ async def start_lobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     games[chat.id]['message_id'] = msg.message_id
-    # Автостарт через 90 секунд, если никто не нажал «Начать»
-    games[chat.id]['timer_task'] = asyncio.create_task(auto_start_game(chat.id, context))
-
+    
 async def auto_start_game(chat_id, context):
     await asyncio.sleep(90)
     game = games.get(chat_id)
@@ -103,22 +101,19 @@ async def lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(game['players']) < 1:
             await query.answer('Нужен хотя бы 1 игрок.', show_alert=True)
             return
-        # Запуск игры
-        if game['timer_task']:
+        # Отменяем таймер, если он был (на всякий случай)
+        if game.get('timer_task'):
             game['timer_task'].cancel()
         await start_game(chat_id, context)
         return
 
-    # Обновить сообщение лобби
+    # Формируем неизменную клавиатуру (всегда видна всем)
+    keyboard = [
+        [InlineKeyboardButton('Сесть за стол', callback_data='bj_join'),
+         InlineKeyboardButton('Выйти из-за стола', callback_data='bj_leave')],
+        [InlineKeyboardButton('Начать игру', callback_data='bj_start')]
+    ]
     names = ', '.join(f'@{game["names"][uid]}' for uid in game['players']) or '—'
-    keyboard = []
-    row = []
-    if user.id in game['players']:
-        row.append(InlineKeyboardButton('Выйти из-за стола', callback_data='bj_leave'))
-    else:
-        row.append(InlineKeyboardButton('Сесть за стол', callback_data='bj_join'))
-    keyboard.append(row)
-    keyboard.append([InlineKeyboardButton('Начать игру', callback_data='bj_start')])
     await query.edit_message_text(
         f'🃏 **Блэкджек стол**\nТекущие игроки: {names}\n'
         f'Нажмите «Сесть» или «Выйти». Когда все готовы — «Начать игру».',
