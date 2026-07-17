@@ -20,9 +20,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- Универсальный обработчик для логирования всех событий ---
+# --- Логирование всех входящих сообщений и нажатий кнопок ---
 async def log_update(update: Update, context):
-    """Логирует любое входящее сообщение или нажатие кнопки."""
     if update.message and update.message.text:
         user = update.message.from_user
         logger.info(
@@ -42,41 +41,40 @@ async def log_update(update: Update, context):
 
 # --- Бот ---
 def run_bot():
-    token = os.environ['BOT_TOKEN']
+    token = os.environ["BOT_TOKEN"]
     app = Application.builder().token(token).build()
 
-    # Логирование всех входящих сообщений (оставлено)
-    async def log_update(update: Update, context):
-        if update.message and update.message.text:
-            user = update.message.from_user
-            logger.info('Сообщение от %s (@%s): %s', user.full_name, user.username, update.message.text)
-        elif update.callback_query:
-            user = update.callback_query.from_user
-            logger.info('Нажата кнопка %s пользователем %s (@%s)', update.callback_query.data, user.full_name, user.username)
+    # Логирование всех событий (самый низкий приоритет)
     app.add_handler(MessageHandler(filters.TEXT, log_update), group=999)
     app.add_handler(CallbackQueryHandler(log_update, pattern=None), group=999)
 
     # Блэкджек
     blackjack.register_handlers(app)
-    app.add_handler(CommandHandler('bj', blackjack.start_lobby))
-    app.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex(r'(?i)^(блэкджек|blackjack|21|очко)$'),
-        blackjack.text_blackjack
-    ))
+    app.add_handler(CommandHandler("bj", blackjack.start_lobby))
+    app.add_handler(CommandHandler("balance", blackjack.balance_command))
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & filters.Regex(r"(?i)^(блэкджек|blackjack|21|очко)$"),
+            blackjack.text_blackjack,
+        )
+    )
 
     # Стартовое меню и приветствия
-    app.add_handler(CommandHandler('start', start_command))
-    app.add_handler(CommandHandler('help', button_handler))
-    app.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex(r'(?i)^(привет|здравствуй|хай|здарова|hello)$'),
-        hello_handler
-    ))
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("help", button_handler))
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT
+            & filters.Regex(r"(?i)^(привет|здравствуй|хай|здарова|hello)$"),
+            hello_handler,
+        )
+    )
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    logger.info('Запускаю бота...')
+    logger.info("Запускаю бота...")
     app.run_polling()
 
-# --- Простой HTTP-сервер для пингов Render ---
+# --- Веб-заглушка для Render ---
 class PingHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -85,7 +83,7 @@ class PingHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"OK")
 
     def log_message(self, format, *args):
-        pass  # отключаем логирование HTTP-запросов в консоль
+        pass
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
