@@ -11,6 +11,8 @@ WELCOME_TEXT = (
     "   Можно играть одному или собраться втроём за одним столом.\n\n"
     "♠️ Покер — Техасский Холдем для компании от 2 до 6 человек.\n"
     "   С виртуальными фишками (по 100 на партию), торговлей и живыми раундами.\n\n"
+    "🂡 Дурак — три режима: подкидной, переводной, простой.\n"
+    "   Против бота или с друзьями (2–4 игрока).\n\n"
     "🔐 Для честной игры:\n"
     "   • Личные карты защищены от пересылки.\n"
     "   • Играть могут только те, кто написал боту в личные сообщения (активировал чат).\n\n"
@@ -82,6 +84,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "   • Игроков: 2–6.\n"
         "   • Торги: чек, бет, рейз, фолд.\n"
         "   • Фишки выдаются каждый раз заново (100 на партию).\n\n"
+        "🂡 Дурак — три режима: подкидной, переводной, простой.\n"
+        "   Можно играть против бота или с друзьями.\n\n"
         "🔒 Защита: все личные сообщения с картами защищены от пересылки.\n"
         "📌 В групповом чате боту нужны права администратора для корректной работы.\n\n"
         "Если что-то пошло не так, просто нажмите /start."
@@ -103,7 +107,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "poker":
         await query.answer("Покер пока в разработке. Скоро!")
     elif data == "durak":
-        await query.answer("Запускаю дурака!")
-        await durak.durak_start(update, context, 'throw')
+        await query.answer()
+        # Показываем выбор режима
+        keyboard = [
+            [InlineKeyboardButton("Подкидной", callback_data="durak_mode_throw")],
+            [InlineKeyboardButton("Переводной", callback_data="durak_mode_transfer")],
+            [InlineKeyboardButton("Простой", callback_data="durak_mode_simple")],
+            [InlineKeyboardButton("Назад", callback_data="back_to_main")]
+        ]
+        await query.edit_message_text(
+            "Выберите режим дурака:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    elif data in ("durak_mode_throw", "durak_mode_transfer", "durak_mode_simple"):
+        mode = data.split('_')[2]
+        await durak.durak_start(update, context, mode)
+    elif data == "back_to_main":
+        await query.edit_message_text(
+            WELCOME_TEXT.format(name=query.from_user.first_name),
+            reply_markup=get_main_keyboard()
+        )
     else:
         await query.answer("Неизвестная команда.")
