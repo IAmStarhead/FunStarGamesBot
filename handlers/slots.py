@@ -18,23 +18,18 @@ PAYOUTS = {
 }
 
 def spin_result():
-    """Генерирует случайный набор 3x3 символов."""
     return [[random.choice(SYMBOLS) for _ in range(3)] for _ in range(3)]
 
 def format_slots(grid):
-    """Форматирует сетку 3x3 в текст."""
-    lines = [' '.join(row) for row in grid]
-    return '\n'.join(lines)
+    return '\n'.join([' '.join(row) for row in grid])
 
 def check_win(grid):
-    """Проверяет центральную линию (второй ряд) на выигрыш."""
-    line = grid[1]
+    line = grid[1]  # центральная линия
     if len(set(line)) == 1:
         return line[0]
     return None
 
 async def start_slots(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Создаёт сообщение со слотами."""
     chat = update.effective_chat
     thread_id = update.effective_message.message_thread_id if update.effective_message else None
     user = update.effective_user
@@ -128,17 +123,27 @@ async def slots_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         add_balance(user.id, -bet)
         balance = get_balance(user.id)
 
-        # Удаляем исходное сообщение
-        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-
-        # Отправляем заставку с эмодзи автомата
-        splash_msg = await context.bot.send_message(
-            chat_id=chat_id,
-            text="🎰 Крутим... 🎰",
-            message_thread_id=thread_id
-        )
-        await asyncio.sleep(2)  # Имитация вращения
-        await context.bot.delete_message(chat_id=chat_id, message_id=splash_msg.message_id)
+        # Анимация: 4 кадра смены символов в этом же сообщении
+        for _ in range(4):
+            grid = spin_result()
+            anim_text = (
+                f"🎰 Крутим... 🎰\n"
+                f"──────────────\n"
+                f"{format_slots(grid)}\n"
+                f"──────────────\n"
+                f"Ставка: {bet} фишек\n"
+                f"Баланс: {balance} фишек"
+            )
+            try:
+                await context.bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=anim_text,
+                    reply_markup=None  # убираем кнопки на время анимации
+                )
+            except:
+                pass  # если сообщение не изменилось, игнорируем
+            await asyncio.sleep(0.35)
 
         # Финальный результат
         final_grid = spin_result()
@@ -170,15 +175,14 @@ async def slots_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Баланс: {new_balance} фишек"
         )
 
-        msg = await context.bot.send_message(
+        await context.bot.edit_message_text(
             chat_id=chat_id,
+            message_id=message_id,
             text=final_text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            message_thread_id=thread_id
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-        # Обновляем состояние, чтобы кнопки работали для нового сообщения
-        slots_state['message_id'] = msg.message_id
+        # Обновляем состояние (message_id тот же)
         slots_state['bet'] = bet
         return
 
