@@ -1,42 +1,43 @@
 import os
-import asyncio
+import threading
 import logging
-from aiohttp import web
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update
 from telegram.ext import Application, CommandHandler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# --- Бот ---
 async def start(update: Update, context):
     user = update.effective_user.first_name
     await update.message.reply_text(f'Привет, {user}! FunStarGames работает 🎲')
-    logger.info(f'Пользователь {user} запустил бота')
+    logger.info(f'Пользователь {user} написал /start')
 
-async def handle(request):
-    return web.Response(text="OK")
-
-async def run_web_server():
-    app = web.Application()
-    app.router.add_get('/', handle)
-    port = int(os.environ.get('PORT', 10000))
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
-    await site.start()
-    logger.info(f'Веб-сервер запущен на порту {port}')
-
-async def main():
+def run_bot():
     token = os.environ['BOT_TOKEN']
-    application = Application.builder().token(token).build()
-    application.add_handler(CommandHandler('start', start))
+    app = Application.builder().token(token).build()
+    app.add_handler(CommandHandler('start', start))
+    logger.info('Запускаю бота...')
+    app.run_polling()
 
-    # Веб-сервер для обхода сна Render
-    asyncio.create_task(run_web_server())
+# --- Простой HTTP-сервер для пингов ---
+class PingHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b'OK')
+    def log_message(self, format, *args):
+        pass  # отключаем логи запросов
 
-    # Запуск поллинга (основной цикл бота)
-    logger.info('Запускаю поллинг...')
-    await application.run_polling()
+def run_web():
+    port = int(os.environ.get('PORT', 10000))
+    server = HTTPServer(('0.0.0.0', port), PingHandler)
+    logger.info(f'Веб-сервер на порту {port}')
+    server.serve_forever()
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    threading.Thread(target=run_web, daemon=True).start()
+    logger.info('Веб-сервер запущен в потоке')
+    run_bot()
