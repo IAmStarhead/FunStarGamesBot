@@ -42,12 +42,12 @@ def hand_display(hand):
 async def start_lobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     if chat.id in games and games[chat.id]['state'] != 'finished':
-        await update.message.reply_text('Игра уже запущена. Дождитесь окончания или напишите "выйти из игры".')
+        await context.bot.send_message(chat.id, 'Игра уже запущена. Дождитесь окончания или напишите "выйти из игры".')
         return
 
     games[chat.id] = {
-        'players': [],       # user_ids
-        'names': {},         # user_id -> first_name
+        'players': [],
+        'names': {},
         'state': 'lobby',
         'message_id': None,
         'timer_task': None
