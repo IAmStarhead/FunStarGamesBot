@@ -14,7 +14,7 @@ from telegram.ext import (
 
 from handlers.start import start_command, hello_handler, button_handler
 from handlers import blackjack, durak, slots
-from wallet import get_balance, transfer, get_user_id_by_username, update_username, set_balance
+from wallet import get_balance, transfer, get_user_id_by_username, update_username
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -78,25 +78,6 @@ async def transfer_command(update: Update, context):
     else:
         await update.message.reply_text("Недостаточно средств.")
 
-# --- Админ-команда /setbalance (только для @iamstarhead) ---
-async def admin_set_balance(update: Update, context):
-    user = update.effective_user
-    if user.username and user.username.lower() == 'iamstarhead':
-        if context.args:
-            try:
-                amount = int(context.args[0])
-                if amount <= 0:
-                    await update.message.reply_text("Сумма должна быть положительной.")
-                    return
-                set_balance(user.id, amount)
-                await update.message.reply_text(f"Ваш баланс установлен на {amount} фишек.")
-            except ValueError:
-                await update.message.reply_text("Укажите число.")
-        else:
-            await update.message.reply_text("Укажите сумму: /setbalance 2000")
-    else:
-        await update.message.reply_text("У вас нет доступа к этой команде.")
-
 # --- Бот ---
 def run_bot():
     token = os.environ["BOT_TOKEN"]
@@ -144,9 +125,6 @@ def run_bot():
             balance_command
         )
     )
-
-    # Админ-команда
-    app.add_handler(CommandHandler("setbalance", admin_set_balance))
 
     # Стартовое меню и приветствия
     app.add_handler(CommandHandler("start", start_command))
