@@ -1,7 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-# --- Данные для приветственного меню ---
 WELCOME_TEXT = (
     "🚀 Приветствую, {name}!\n\n"
     "Я — FunStarGames, ваш карманный клуб для весёлых посиделок.\n"
@@ -20,7 +19,6 @@ WELCOME_TEXT = (
     "Выбирайте, с чего начнём:"
 )
 
-# Клавиатура с кнопками под сообщением
 def get_main_keyboard():
     keyboard = [
         [
@@ -34,9 +32,7 @@ def get_main_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 # --- Обработчики ---
-
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отвечает на команду /start"""
     user = update.effective_user.first_name
     await update.message.reply_text(
         WELCOME_TEXT.format(name=user),
@@ -44,39 +40,41 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def hello_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отвечает на обычное приветствие (привет, здарова и т.п.)"""
     user = update.effective_user.first_name
     text = f"Привет, {user}! 👋\nРад тебя видеть. Хочешь перекинуться в блэкджек или собрать стол для покера?\nЖми на кнопки ниже или напиши «помощь», если нужны правила."
     await update.message.reply_text(text, reply_markup=get_main_keyboard())
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отвечает на команду /help и кнопку Помощь"""
+    """Подробная текстовая справка (для команды /help)"""
     help_text = (
-        "ℹ️ **Помощь по FunStarGames**\n\n"
-        "🎮 **Блэкджек** — игра против дилера. Цель: набрать 21 очко или больше, чем у дилера, но не переборщить.\n"
+        "ℹ️ Помощь по FunStarGames\n\n"
+        "🎮 Блэкджек — игра против дилера. Цель: набрать 21 очко или больше, чем у дилера, но не переборщить.\n"
         "   • Игроков: 1–3.\n\n"
-        "♠️ **Покер** — Техасский Холдем. Игроки получают по 2 карты, затем на стол выкладываются 5 общих.\n"
+        "♠️ Покер — Техасский Холдем. Игроки получают по 2 карты, затем на стол выкладываются 5 общих.\n"
         "   • Игроков: 2–6.\n"
         "   • Торги: чек, бет, рейз, фолд.\n"
         "   • Фишки выдаются каждый раз заново (100 на партию).\n\n"
-        "🔒 **Защита:** все личные сообщения с картами защищены от пересылки.\n"
-        "📌 **В групповом чате** боту нужны права администратора для корректной работы.\n\n"
+        "🔒 Защита: все личные сообщения с картами защищены от пересылки.\n"
+        "📌 В групповом чате боту нужны права администратора для корректной работы.\n\n"
         "Если что-то пошло не так, просто нажмите /start."
     )
     await update.message.reply_text(help_text)
 
-# --- Обработчик колбэков (пока заглушки) ---
+# --- Главный обработчик нажатий на кнопки ---
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает нажатия на кнопки меню"""
     query = update.callback_query
-    await query.answer()  # убирает часы ожидания
     data = query.data
 
-    if data == "blackjack":
-        await query.edit_message_text("🃏 Блэкджек пока в разработке. Скоро появится!")
+    if data == "help":
+        # Всплывающее окно с подсказкой (не трогает меню)
+        await query.answer(
+            text="🃏 Блэкджек (1-3 игрока)\n♠️ Покер (2-6 игроков)\nПодробнее: /help",
+            show_alert=True
+        )
+    elif data == "blackjack":
+        # Быстрое уведомление, меню остаётся
+        await query.answer("Блэкджек пока в разработке. Скоро!")
     elif data == "poker":
-        await query.edit_message_text("♠️ Покер пока в разработке. Скоро появится!")
-    elif data == "help":
-        await help_command(update, context)  # вызываем тот же текст помощи
+        await query.answer("Покер пока в разработке. Скоро!")
     else:
-        await query.edit_message_text("Неизвестная команда.")
+        await query.answer("Неизвестная команда.")
