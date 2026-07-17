@@ -100,11 +100,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "blackjack":
         await query.answer("Запускаю блэкджек!")
         await blackjack.start_lobby(update, context)
-    elif data == "durak":
-        await query.answer("Запускаю дурака!")
-        # по умолчанию подкидной
-        await durak.durak_start(update, context, 'throw')
     elif data == "poker":
         await query.answer("Покер пока в разработке. Скоро!")
+    elif data == "durak":
+        await query.answer("Запускаю дурака!")
+        await durak.durak_start(update, context, 'throw')
     else:
         await query.answer("Неизвестная команда.")
