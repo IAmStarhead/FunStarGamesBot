@@ -32,16 +32,16 @@ def get_main_keyboard():
     ]
     return InlineKeyboardMarkup(keyboard)
 
-# --- Обработчики ---
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user.first_name
+    thread_id = update.effective_message.message_thread_id if update.effective_message else None
     await update.message.reply_text(
         WELCOME_TEXT.format(name=user),
-        reply_markup=get_main_keyboard()
+        reply_markup=get_main_keyboard(),
+        message_thread_id=thread_id
     )
 
 async def hello_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отвечает на приветствие, если обращаются к боту или это личный чат."""
     message = update.message
     if not message:
         return
@@ -49,8 +49,8 @@ async def hello_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     bot_username = context.bot.username.lower()
+    thread_id = update.effective_message.message_thread_id if update.effective_message else None
 
-    # В личном чате отвечаем всегда
     if chat.type == "private":
         text = (
             f"Привет, {user.first_name}! 👋\n"
@@ -60,20 +60,17 @@ async def hello_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text(text, reply_markup=get_main_keyboard())
         return
 
-    # В групповом чате проверяем, обращаются ли к боту
     mentioned = False
     if f"@{bot_username}" in message.text.lower():
         mentioned = True
-    # Также проверяем, является ли сообщение ответом на сообщение бота
     if message.reply_to_message and message.reply_to_message.from_user.id == context.bot.id:
         mentioned = True
 
     if mentioned:
         text = f"{user.first_name}, привет! 👋 Жми кнопки или напиши «помощь»."
-        await message.reply_text(text, reply_markup=get_main_keyboard())
+        await message.reply_text(text, reply_markup=get_main_keyboard(), message_thread_id=thread_id)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Подробная текстовая справка (для команды /help)"""
     help_text = (
         "ℹ️ Помощь по FunStarGames\n\n"
         "🎮 Блэкджек — игра против дилера. Цель: набрать 21 очко или больше, чем у дилера, но не переборщить.\n"
@@ -88,7 +85,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(help_text)
 
-# --- Главный обработчик нажатий на кнопки ---
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
