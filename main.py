@@ -14,7 +14,7 @@ from telegram.ext import (
 
 from handlers.start import start_command, hello_handler, button_handler
 from handlers import blackjack, durak, slots
-from wallet import get_balance, transfer, get_user_id_by_username, update_username
+from wallet import get_balance, transfer, get_user_id_by_username, update_username, set_balance
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -22,6 +22,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# --- Логирование только обращений к боту ---
 async def log_update(update: Update, context):
     if update.message and update.message.text:
         user = update.message.from_user
@@ -38,6 +39,7 @@ async def log_update(update: Update, context):
         user = update.callback_query.from_user
         logger.info("Нажата кнопка %s пользователем %s (@%s)", update.callback_query.data, user.full_name, user.username)
 
+# --- Команды баланса и переводов ---
 async def balance_command(update: Update, context):
     if context.args:
         username = context.args[0]
@@ -76,6 +78,26 @@ async def transfer_command(update: Update, context):
     else:
         await update.message.reply_text("Недостаточно средств.")
 
+# --- Админ-команда /setbalance (только для @iamstarhead) ---
+async def admin_set_balance(update: Update, context):
+    user = update.effective_user
+    if user.username and user.username.lower() == 'iamstarhead':
+        if context.args:
+            try:
+                amount = int(context.args[0])
+                if amount <= 0:
+                    await update.message.reply_text("Сумма должна быть положительной.")
+                    return
+                set_balance(user.id, amount)
+                await update.message.reply_text(f"Ваш баланс установлен на {amount} фишек.")
+            except ValueError:
+                await update.message.reply_text("Укажите число.")
+        else:
+            await update.message.reply_text("Укажите сумму: /setbalance 2000")
+    else:
+        await update.message.reply_text("У вас нет доступа к этой команде.")
+
+# --- Бот ---
 def run_bot():
     token = os.environ["BOT_TOKEN"]
     app = Application.builder().token(token).build()
@@ -83,6 +105,7 @@ def run_bot():
     app.add_handler(MessageHandler(filters.TEXT, log_update), group=999)
     app.add_handler(CallbackQueryHandler(log_update, pattern=None), group=999)
 
+    # Блэкджек
     blackjack.register_handlers(app)
     app.add_handler(CommandHandler("bj", blackjack.start_lobby))
     app.add_handler(
@@ -92,6 +115,7 @@ def run_bot():
         )
     )
 
+    # Дурак
     durak.register_handlers(app)
     app.add_handler(CommandHandler("durak", lambda u, c: durak.durak_start(u, c, 'throw')))
     app.add_handler(
@@ -101,6 +125,7 @@ def run_bot():
         )
     )
 
+    # Слоты
     slots.register_handlers(app)
     app.add_handler(CommandHandler("slots", slots.start_slots))
     app.add_handler(
@@ -110,6 +135,7 @@ def run_bot():
         )
     )
 
+    # Баланс и переводы
     app.add_handler(CommandHandler("balance", balance_command))
     app.add_handler(CommandHandler("transfer", transfer_command))
     app.add_handler(
@@ -119,6 +145,10 @@ def run_bot():
         )
     )
 
+    # Админ-команда
+    app.add_handler(CommandHandler("setbalance", admin_set_balance))
+
+    # Стартовое меню и приветствия
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", button_handler))
     app.add_handler(
@@ -135,6 +165,7 @@ def run_bot():
     logger.info("Запускаю бота...")
     app.run_polling()
 
+# --- Веб-заглушка ---
 class PingHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
