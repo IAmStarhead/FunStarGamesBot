@@ -40,9 +40,36 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def hello_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user.first_name
-    text = f"Привет, {user}! 👋\nРад тебя видеть. Хочешь перекинуться в блэкджек или собрать стол для покера?\nЖми на кнопки ниже или напиши «помощь», если нужны правила."
-    await update.message.reply_text(text, reply_markup=get_main_keyboard())
+    """Отвечает на приветствие, если обращаются к боту или это личный чат."""
+    message = update.message
+    if not message:
+        return
+
+    chat = update.effective_chat
+    user = update.effective_user
+    bot_username = context.bot.username.lower()
+
+    # В личном чате отвечаем всегда
+    if chat.type == "private":
+        text = (
+            f"Привет, {user.first_name}! 👋\n"
+            "Рад тебя видеть. Хочешь перекинуться в блэкджек или собрать стол для покера?\n"
+            "Жми на кнопки ниже или напиши «помощь», если нужны правила."
+        )
+        await message.reply_text(text, reply_markup=get_main_keyboard())
+        return
+
+    # В групповом чате проверяем, обращаются ли к боту
+    mentioned = False
+    if f"@{bot_username}" in message.text.lower():
+        mentioned = True
+    # Также проверяем, является ли сообщение ответом на сообщение бота
+    if message.reply_to_message and message.reply_to_message.from_user.id == context.bot.id:
+        mentioned = True
+
+    if mentioned:
+        text = f"{user.first_name}, привет! 👋 Жми кнопки или напиши «помощь»."
+        await message.reply_text(text, reply_markup=get_main_keyboard())
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Подробная текстовая справка (для команды /help)"""
