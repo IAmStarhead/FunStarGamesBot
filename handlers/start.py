@@ -13,6 +13,7 @@ WELCOME_TEXT = (
     "   С виртуальными фишками (по 100 на партию), торговлей и живыми раундами.\n\n"
     "🂡 Дурак — три режима: подкидной, переводной, простой.\n"
     "   Против бота или с друзьями (2–4 игрока).\n\n"
+    "🎰 Слоты — однорукий бандит с анимацией.\n\n"
     "🔐 Для честной игры:\n"
     "   • Личные карты защищены от пересылки.\n"
     "   • Играть могут только те, кто написал боту в личные сообщения (активировал чат).\n\n"
@@ -89,6 +90,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "   • Фишки выдаются каждый раз заново (100 на партию).\n\n"
         "🂡 Дурак — три режима: подкидной, переводной, простой.\n"
         "   Можно играть против бота или с друзьями.\n\n"
+        "🎰 Слоты — классический автомат. Выбирайте ставку и крутите барабаны.\n\n"
         "🔒 Защита: все личные сообщения с картами защищены от пересылки.\n"
         "📌 В групповом чате боту нужны права администратора для корректной работы.\n\n"
         "Если что-то пошло не так, просто нажмите /start."
@@ -101,7 +103,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "help":
         await query.answer(
-            text="🃏 Блэкджек (1-3 игрока)\n♠️ Покер (2-6 игроков)\nПодробнее: /help",
+            text="🃏 Блэкджек (1-3 игрока)\n♠️ Покер (2-6 игроков)\n🂡 Дурак\n🎰 Слоты\nПодробнее: /help",
             show_alert=True
         )
     elif data == "blackjack":
@@ -111,9 +113,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Покер пока в разработке. Скоро!")
     elif data == "durak":
         await query.answer()
-    elif data == "slots":
-        await query.answer("Запускаю слоты!")
-        await slots.start_slots(update, context)
         # Показываем выбор режима
         keyboard = [
             [InlineKeyboardButton("Подкидной", callback_data="durak_mode_throw")],
@@ -126,12 +125,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     elif data in ("durak_mode_throw", "durak_mode_transfer", "durak_mode_simple"):
-        mode = data.split('_')[2]
+        mode = data.split('_')[2]  # throw / transfer / simple
         await durak.durak_start(update, context, mode)
     elif data == "back_to_main":
         await query.edit_message_text(
             WELCOME_TEXT.format(name=query.from_user.first_name),
             reply_markup=get_main_keyboard()
         )
+    elif data == "slots":
+        await query.answer("Запускаю слоты!")
+        await slots.start_slots(update, context)
     else:
         await query.answer("Неизвестная команда.")
