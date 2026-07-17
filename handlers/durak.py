@@ -54,7 +54,7 @@ async def durak_start(update: Update, context: ContextTypes.DEFAULT_TYPE, mode='
         'mode': mode,
         'bet_amount': 0,
         'vs_bot': False,
-        'player_messages': {}   # user_id -> message_id личного сообщения
+        'player_messages': {}
     }
 
     keyboard = [
@@ -98,7 +98,6 @@ async def update_lobby_message(chat_id, context):
         [InlineKeyboardButton('Начать игру', callback_data='durak_start')],
         [InlineKeyboardButton('Играть с ботом (1 игрок)', callback_data='durak_play_vs_bot')]
     ]
-    # edit_message_text не принимает message_thread_id, поэтому убираем
     await context.bot.edit_message_text(
         chat_id=chat_id,
         message_id=game['message_id'],
@@ -180,7 +179,7 @@ async def start_durak_game(chat_id, context):
     game['deck'] = new_deck()
     game['trump'] = random.choice(SUITS)
     game['hands'] = {}
-    game['table'] = []          # список (card, user_id, role: 'attack'/'defend')
+    game['table'] = []
     game['turn_order'] = game['players'][:]
     game['attacker_index'] = 0
     game['defender_index'] = 1 % len(game['players'])
@@ -192,7 +191,6 @@ async def start_durak_game(chat_id, context):
     for uid in game['players']:
         game['hands'][uid] = [game['deck'].pop() for _ in range(min(6, len(game['deck'])))]
 
-    # Определение первого хода (младший козырь)
     if game['mode'] in ('throw', 'transfer'):
         min_rank = len(RANKS)
         first = game['players'][0]
@@ -212,12 +210,10 @@ async def start_durak_game(chat_id, context):
         game['attacker_index'] = 0
         game['defender_index'] = 1 % len(game['players'])
 
-    # Отправляем личные сообщения всем живым игрокам
     for uid in game['players']:
         if uid != -1:
             await send_or_update_game_message(uid, game, context)
 
-    # Лог в общий чат
     thread_id = game['thread_id']
     names = ', '.join(f'@{game["names"][uid]}' if uid != -1 else 'Бот' for uid in game['players'])
     attacker_id = game['turn_order'][game['attacker_index']]
@@ -228,15 +224,12 @@ async def start_durak_game(chat_id, context):
         message_thread_id=thread_id
     )
 
-    # Если первый ходит бот – запускаем его действие
     if attacker_id == -1:
         await bot_turn(chat_id, context)
     else:
         reset_timer(game, attacker_id, context, chat_id)
 
-# === Личное сообщение игрока ===
 async def send_or_update_game_message(user_id, game, context):
-    """Отправляет или обновляет личное сообщение с полным состоянием игры."""
     if user_id == -1:
         return
 
@@ -249,17 +242,15 @@ async def send_or_update_game_message(user_id, game, context):
     attacker_id = game['turn_order'][attacker_idx]
     defender_id = game['turn_order'][defender_idx]
 
-    # Формируем текст стола
     if table:
         table_text = "Стол:\n"
         for card, pid, role in table:
-            role_text = "ходит" if role == 'attack' else "бьёт" if role == 'defend' else role
+            role_text = "ходит" if role == 'attack' else "бьёт"
             name = game['names'][pid]
             table_text += f"{name} {role_text}: {card}\n"
     else:
         table_text = "Стол пуст.\n"
 
-    # Определяем статус
     if phase == 'attack':
         if attacker_id == user_id:
             status = "Ваш ход. Выберите карту для хода."
@@ -279,13 +270,12 @@ async def send_or_update_game_message(user_id, game, context):
             status = f"Подкидывает {game['names'][game['turn_order'][game['throw_order']]]}."
     elif phase == 'transfer':
         if defender_id == user_id:
-            status = "Можно перевести или отбиться/забрать."
+            status = "Можно перевести, отбиться или забрать."
         else:
             status = f"Переводит {game['names'][defender_id]}."
     else:
         status = "Ожидайте."
 
-    # Формируем клавиатуру с картами и кнопками действий
     keyboard = []
     row = []
     for i, card in enumerate(hand):
@@ -296,7 +286,6 @@ async def send_or_update_game_message(user_id, game, context):
     if row:
         keyboard.append(row)
 
-    # Кнопки действий
     action_row = []
     action_row.append(InlineKeyboardButton('Бито', callback_data='durak_action_beaten'))
     action_row.append(InlineKeyboardButton('Забрать', callback_data='durak_action_take'))
@@ -306,7 +295,6 @@ async def send_or_update_game_message(user_id, game, context):
 
     text = f"♠️ Козырь: {trump}\n\n{table_text}\nВаша рука:\n{status}"
 
-    # Если уже есть сообщение, пробуем редактировать, иначе отправляем новое
     if user_id in game['player_messages']:
         try:
             await context.bot.edit_message_text(
@@ -318,7 +306,6 @@ async def send_or_update_game_message(user_id, game, context):
             return
         except Exception as e:
             logger.warning(f"Не удалось отредактировать сообщение для {user_id}: {e}")
-    # Отправляем новое
     msg = await context.bot.send_message(
         user_id,
         text,
@@ -327,7 +314,6 @@ async def send_or_update_game_message(user_id, game, context):
     )
     game['player_messages'][user_id] = msg.message_id
 
-# === Лог в общий чат ===
 async def log_to_chat(chat_id, text, game, context):
     await context.bot.send_message(
         chat_id,
@@ -335,7 +321,6 @@ async def log_to_chat(chat_id, text, game, context):
         message_thread_id=game['thread_id']
     )
 
-# === Основной обработчик действий игрока ===
 async def durak_card_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -369,7 +354,9 @@ async def durak_card_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         elif game['phase'] == 'throw':
             await throw_with_card(user_id, idx, game, context, chat_id)
         elif game['phase'] == 'transfer':
-            await transfer_with_card(user_id, idx, game, context, chat_id)
+            # В фазе перевода защищающийся может либо отбиться, либо перевести
+            # Если он выбрал карту, пробуем отбиться (если это возможно)
+            await defend_with_card(user_id, idx, game, context, chat_id)
     elif data == 'durak_action_beaten':
         await action_beaten(user_id, game, context, chat_id)
     elif data == 'durak_action_take':
@@ -381,8 +368,12 @@ async def attack_with_card(user_id, card_idx, game, context, chat_id):
     hand = game['hands'][user_id]
     card = hand.pop(card_idx)
     game['table'].append((card, user_id, 'attack'))
-    game['phase'] = 'defend'
     await log_to_chat(chat_id, f"{game['names'][user_id]} ходит {card}", game, context)
+    # В зависимости от режима переходим в нужную фазу
+    if game['mode'] == 'transfer':
+        game['phase'] = 'transfer'
+    else:
+        game['phase'] = 'defend'
     await update_all_players(game, context)
     defender_id = game['turn_order'][game['defender_index']]
     if defender_id == -1:
@@ -524,13 +515,11 @@ async def take_cards(game, context, chat_id):
 async def end_turn(game, context, chat_id, skip_attacker_change=False):
     if game['turn_timer']:
         game['turn_timer'].cancel()
-    # Добор карт
     for uid in game['players']:
         while len(game['hands'][uid]) < 6 and game['deck']:
             game['hands'][uid].append(game['deck'].pop())
     game['table'].clear()
 
-    # Проверка победы
     for uid in game['players']:
         if not game['hands'][uid] and not game['deck']:
             winner = uid
@@ -538,14 +527,13 @@ async def end_turn(game, context, chat_id, skip_attacker_change=False):
                 await log_to_chat(chat_id, '🤖 Бот выиграл! Вы дурак.', game, context)
             else:
                 total_bet = sum(game['bets'].values())
-                add_balance(winner, total_bet)
-                await log_to_chat(chat_id, f'🏆 {game["names"][winner]} выиграл и забирает банк {total_bet} фишек!', game, context)
+                # Игрок получает удвоенную ставку (возврат + выигрыш)
+                add_balance(winner, total_bet * 2)
+                await log_to_chat(chat_id, f'🏆 {game["names"][winner]} выиграл и забирает банк {total_bet * 2} фишек!', game, context)
             game['state'] = 'finished'
-            # Удаляем личные сообщения (опционально)
             durak_games.pop(chat_id, None)
             return
 
-    # Переход хода
     if not skip_attacker_change:
         game['attacker_index'] = game['defender_index']
     else:
@@ -591,7 +579,6 @@ async def bot_turn(chat_id, context):
     game = durak_games[chat_id]
     if game['state'] != 'playing':
         return
-    # Показываем, что бот думает
     for uid in game['players']:
         if uid != -1:
             await send_or_update_game_message(uid, game, context)
@@ -629,15 +616,26 @@ async def bot_turn(chat_id, context):
         else:
             await action_beaten(bot_id, game, context, chat_id)
     elif game['phase'] == 'transfer':
-        if game['mode'] == 'transfer':
-            first_attack = next((c for c, pid, role in game['table'] if role == 'attack'), None)
-            if first_attack:
-                rank = card_rank(first_attack[0])
-                possible = [(i, card) for i, card in enumerate(hand) if card_rank(card) == rank]
-                if possible:
-                    idx = possible[0][0]
-                    await transfer_with_card(bot_id, idx, game, context, chat_id)
-                    return
+        # Бот в роли защитника в переводном режиме: либо перевести, либо отбить, либо забрать
+        # Попробуем сначала отбиться, если есть чем
+        last_attack = next(((c, pid) for c, pid, role in reversed(game['table']) if role == 'attack'), None)
+        if last_attack:
+            attack_card = last_attack[0]
+            # Проверяем возможность отбития
+            possible_def = [(i, card) for i, card in enumerate(hand) if can_beat(attack_card, card, game['trump'])]
+            if possible_def:
+                possible_def.sort(key=lambda x: (CARD_VALUES[card_rank(x[1])], card_suit(x[1])))
+                idx = possible_def[0][0]
+                await defend_with_card(bot_id, idx, game, context, chat_id)
+                return
+            # Если не можем отбить, пробуем перевести
+            rank = card_rank(attack_card)
+            possible_trans = [(i, card) for i, card in enumerate(hand) if card_rank(card) == rank]
+            if possible_trans:
+                idx = possible_trans[0][0]
+                await transfer_with_card(bot_id, idx, game, context, chat_id)
+                return
+        # Если ничего нельзя, забираем
         await take_cards(game, context, chat_id)
 
 # === Текстовые триггеры ===
