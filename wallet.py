@@ -1,45 +1,63 @@
-import json
+import sqlite3
 import os
 import logging
 
 logger = logging.getLogger(__name__)
 
-BALANCE_FILE = "balances.json"
+DB_FILE = "balances.db"
 START_BALANCE = 1000
 
-# Загружаем данные из файла при старте
-if os.path.exists(BALANCE_FILE):
-    with open(BALANCE_FILE, 'r', encoding='utf-8') as f:
-        _data = json.load(f)
-else:
-    _data = {}
+# Инициализация базы данных
+def _get_conn():
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-# _data имеет структуру: { "user_id": {"balance": int, "username": str}, ... }
+def _init_db():
+    conn = _get_conn()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS balances (
+            user_id INTEGER PRIMARY KEY,
+            balance INTEGER NOT NULL DEFAULT 1000,
+            username TEXT
+        )
+    """)
+    # Миграция из старого JSON (если есть и БД пуста)
+    if os.path.exists("balances.json"):
+        cur = conn.execute("SELECT COUNT(*) FROM balances")
+        if cur.fetchone()[0] == 0:
+            import json
+            with open("balances.json", "r", encoding="utf-8") as f:
+                old_data = json.load(f)
+            for uid, info in old_data.items():
+                conn.execute(
+                    "INSERT OR REPLACE INTO balances (user_id, balance, username) VALUES (?, ?, ?)",
+                    (int(uid), info.get("balance", START_BALANCE), info.get("username"))
+                )
+            conn.commit()
+            logger.info("Перенесены данные из balances.json в SQLite")
+    conn.close()
 
-def _save():
-    with open(BALANCE_FILE, 'w', encoding='utf-8') as f:
-        json.dump(_data, f, ensure_ascii=False, indent=2)
-
-def _ensure_user(user_id, username=None):
-    key = str(user_id)
-    if key not in _data:
-        _data[key] = {"balance": START_BALANCE, "username": username}
-        _save()
-    elif username and _data[key].get("username") != username:
-        _data[key]["username"] = username
-        _save()
+_init_db()
 
 def get_balance(user_id):
-    key = str(user_id)
-    return _data.get(key, {}).get("balance", START_BALANCE)
+    conn = _get_conn()
+    row = conn.execute("SELECT balance FROM balances WHERE user_id = ?", (user_id,)).fetchone()
+    if row:
+        return row["balance"]
+    else:
+        # Авто-создание записи со стартовым балансом
+        conn.execute("INSERT INTO balances (user_id, balance) VALUES (?, ?)", (user_id, START_BALANCE))
+        conn.commit()
+        return START_BALANCE
 
 def set_balance(user_id, amount):
-    key = str(user_id)
-    if key not in _data:
-        _data[key] = {"balance": amount, "username": None}
-    else:
-        _data[key]["balance"] = amount
-    _save()
+    conn = _get_conn()
+    conn.execute(
+        "INSERT INTO balances (user_id, balance) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET balance = excluded.balance",
+        (user_id, amount)
+    )
+    conn.commit()
 
 def add_balance(user_id, amount):
     new_bal = get_balance(user_id) + amount
@@ -53,17 +71,19 @@ def transfer(from_id, to_id, amount):
     return True
 
 def get_user_id_by_username(username):
-    # Ищем username в данных (без @)
+    conn = _get_conn()
     clean = username.lstrip('@')
-    for uid, info in _data.items():
-        if info.get("username") == clean:
-            return int(uid)
+    row = conn.execute("SELECT user_id FROM balances WHERE username = ?", (clean,)).fetchone()
+    if row:
+        return row["user_id"]
     return None
 
 def update_username(user_id, username):
-    key = str(user_id)
-    if key in _data:
-        _data[key]["username"] = username
-        _save()
-    else:
-        _ensure_user(user_id, username)
+    if username is None:
+        return
+    conn = _get_conn()
+    conn.execute(
+        "INSERT INTO balances (user_id, balance, username) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET username = excluded.username",
+        (user_id, START_BALANCE, username)
+    )
+    conn.commit()
