@@ -94,14 +94,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data == "help":
-        # Всплывающее окно с подсказкой (не трогает меню)
         await query.answer(
             text="🃏 Блэкджек (1-3 игрока)\n♠️ Покер (2-6 игроков)\nПодробнее: /help",
             show_alert=True
         )
     elif data == "blackjack":
-        # Быстрое уведомление, меню остаётся
-        await query.answer("Блэкджек пока в разработке. Скоро!")
+        await query.answer("Запускаю блэкджек!")
+        await blackjack.start_lobby(update, context)
     elif data == "poker":
         await query.answer("Покер пока в разработке. Скоро!")
     else:
