@@ -27,6 +27,9 @@ def get_main_keyboard():
             InlineKeyboardButton("♠️ Покер", callback_data="poker"),
         ],
         [
+            InlineKeyboardButton("🂡 Дурак", callback_data="durak"),
+        ],
+        [
             InlineKeyboardButton("ℹ️ Помощь", callback_data="help"),
         ]
     ]
