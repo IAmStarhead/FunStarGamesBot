@@ -1,5 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from handlers import blackjack
 
 WELCOME_TEXT = (
     "🚀 Приветствую, {name}!\n\n"
