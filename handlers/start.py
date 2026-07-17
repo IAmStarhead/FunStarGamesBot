@@ -32,6 +32,9 @@ def get_main_keyboard():
             InlineKeyboardButton("🂡 Дурак", callback_data="durak"),
         ],
         [
+            InlineKeyboardButton("🎰 Слоты", callback_data="slots"),
+        ],
+        [
             InlineKeyboardButton("ℹ️ Помощь", callback_data="help"),
         ]
     ]
