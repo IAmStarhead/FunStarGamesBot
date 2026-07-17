@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 from handlers.start import start_command, hello_handler, button_handler
-from handlers import blackjack
+from handlers import blackjack, durak
 from wallet import get_balance, transfer, get_user_id_by_username, update_username
 
 logging.basicConfig(
@@ -42,7 +42,6 @@ async def log_update(update: Update, context):
 
 # --- Команды баланса и переводов ---
 async def balance_command(update: Update, context):
-    # Если есть аргумент @username, смотрим чужой баланс
     if context.args:
         username = context.args[0]
         target_id = get_user_id_by_username(username)
@@ -95,6 +94,16 @@ def run_bot():
         MessageHandler(
             filters.TEXT & filters.Regex(r"(?i)^(блэкджек|blackjack|21|очко)$"),
             blackjack.text_blackjack,
+        )
+    )
+
+    # Дурак
+    durak.register_handlers(app)
+    app.add_handler(CommandHandler("durak", lambda u, c: durak.durak_start(u, c, 'throw')))  # по умолчанию подкидной
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & filters.Regex(r"(?i)^дурак"),
+            durak.text_durak
         )
     )
 
