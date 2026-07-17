@@ -11,6 +11,8 @@ from telegram.ext import (
     filters,
 )
 
+from handlers import blackjack
+
 # Импортируем обработчики стартового меню
 from handlers.start import start_command, hello_handler, button_handler
 
