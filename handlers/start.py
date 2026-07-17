@@ -1,7 +1,5 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-import logging
-logger = logging.getLogger(__name__)
 
 WELCOME_TEXT = (
     "🚀 Приветствую, {name}!\n\n"
