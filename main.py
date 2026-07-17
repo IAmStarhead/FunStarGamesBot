@@ -1,4 +1,5 @@
 import os
+import time
 import threading
 import logging
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -21,24 +22,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- Логирование ---
+# --- Логирование только обращений к боту ---
 async def log_update(update: Update, context):
     if update.message and update.message.text:
         user = update.message.from_user
-        logger.info(
-            "Сообщение от %s (@%s): %s",
-            user.full_name,
-            user.username,
-            update.message.text,
-        )
+        chat = update.effective_chat
+        if chat.type == 'private':
+            logger.info("ЛС от %s (@%s): %s", user.full_name, user.username, update.message.text)
+        else:
+            text = update.message.text.lower()
+            bot_username = context.bot.username.lower()
+            if f'@{bot_username}' in text or \
+               (update.message.reply_to_message and update.message.reply_to_message.from_user.id == context.bot.id):
+                logger.info("Обращение к боту от %s (@%s): %s", user.full_name, user.username, update.message.text)
     elif update.callback_query:
         user = update.callback_query.from_user
-        logger.info(
-            "Нажата кнопка %s пользователем %s (@%s)",
-            update.callback_query.data,
-            user.full_name,
-            user.username,
-        )
+        logger.info("Нажата кнопка %s пользователем %s (@%s)", update.callback_query.data, user.full_name, user.username)
 
 # --- Команды баланса и переводов ---
 async def balance_command(update: Update, context):
@@ -99,7 +98,7 @@ def run_bot():
 
     # Дурак
     durak.register_handlers(app)
-    app.add_handler(CommandHandler("durak", lambda u, c: durak.durak_start(u, c, 'throw')))  # по умолчанию подкидной
+    app.add_handler(CommandHandler("durak", lambda u, c: durak.durak_start(u, c, 'throw')))
     app.add_handler(
         MessageHandler(
             filters.TEXT & filters.Regex(r"(?i)^дурак"),
@@ -129,6 +128,8 @@ def run_bot():
     )
     app.add_handler(CallbackQueryHandler(button_handler))
 
+    logger.info("Ожидаю 5 секунд, чтобы старый инстанс освободил обновления...")
+    time.sleep(5)
     logger.info("Запускаю бота...")
     app.run_polling()
 
