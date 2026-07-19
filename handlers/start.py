@@ -125,7 +125,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     elif data in ("durak_mode_throw", "durak_mode_transfer", "durak_mode_simple"):
-        mode = data.split('_')[2]  # throw / transfer / simple
+        mode = data.split('_')[2]
         await durak.durak_start(update, context, mode)
     elif data == "back_to_main":
         await query.edit_message_text(
