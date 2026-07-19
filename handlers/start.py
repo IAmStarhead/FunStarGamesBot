@@ -43,9 +43,7 @@ def get_main_keyboard():
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    # Активируем пользователя (разрешаем участвовать в играх с личными сообщениями)
-    durak.activate_user(user.id)
-    
+    durak.activate_user(user.id)  # активация для игр с личными сообщениями
     thread_id = update.effective_message.message_thread_id if update.effective_message else None
     await update.message.reply_text(
         WELCOME_TEXT.format(name=user.first_name),
@@ -116,7 +114,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Покер пока в разработке. Скоро!")
     elif data == "durak":
         await query.answer()
-        # Показываем выбор режима
         keyboard = [
             [InlineKeyboardButton("Подкидной", callback_data="durak_mode_throw")],
             [InlineKeyboardButton("Переводной", callback_data="durak_mode_transfer")],
@@ -130,6 +127,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data in ("durak_mode_throw", "durak_mode_transfer", "durak_mode_simple"):
         mode = data.split('_')[2]
         await durak.durak_start(update, context, mode)
+        # Удаляем сообщение с выбором режима
+        try:
+            await query.message.delete()
+        except:
+            pass
     elif data == "back_to_main":
         await query.edit_message_text(
             WELCOME_TEXT.format(name=query.from_user.first_name),
