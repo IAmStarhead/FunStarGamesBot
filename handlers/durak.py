@@ -3,7 +3,7 @@ import asyncio
 import os
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CallbackQueryHandler
+from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 from wallet import get_balance, add_balance
 
 logger = logging.getLogger(__name__)
