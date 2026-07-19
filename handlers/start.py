@@ -42,10 +42,13 @@ def get_main_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user.first_name
+    user = update.effective_user
+    # Активируем пользователя (разрешаем участвовать в играх с личными сообщениями)
+    durak.activate_user(user.id)
+    
     thread_id = update.effective_message.message_thread_id if update.effective_message else None
     await update.message.reply_text(
-        WELCOME_TEXT.format(name=user),
+        WELCOME_TEXT.format(name=user.first_name),
         reply_markup=get_main_keyboard(),
         message_thread_id=thread_id
     )
