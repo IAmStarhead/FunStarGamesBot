@@ -300,7 +300,7 @@ async def send_or_update_game_message(user_id, game, context):
         if phase == 'attack':
             status = "Ваш ход. Выберите карту для хода."
         elif phase == 'defend':
-            status = "Ваш ход. Отбивайтесь или забирайте."
+            status = "Ваш ход. Выберите карту для отбоя.\n(Карта должна побить одну из атакующих карт на столе)"
         elif phase == 'throw':
             status = "Можно подкинуть карту того же достоинства или нажать «Бито»."
         elif phase == 'transfer':
@@ -445,10 +445,15 @@ async def attack_with_card(user_id, card_idx, game, context, chat_id):
     action_text = f"{game['names'][user_id]} ходит {card}"
     game['last_action'] = action_text
     await log_to_chat(chat_id, action_text, game, context)
-    if game['mode'] == 'transfer':
+
+    # Если у атакующего осталась только одна карта после хода, перевод невозможен — переходим в защиту
+    if game['mode'] == 'transfer' and len(hand) == 1:
+        game['phase'] = 'defend'
+    elif game['mode'] == 'transfer':
         game['phase'] = 'transfer'
     else:
         game['phase'] = 'defend'
+
     await update_all_players(game, context)
     defender_id = game['turn_order'][game['defender_index']]
     if defender_id == -1:
@@ -461,7 +466,6 @@ async def defend_with_card(user_id, card_idx, game, context, chat_id):
     hand = game['hands'][user_id]
     card = hand[card_idx]
 
-    # Ищем любую атакующую карту на столе, которую можно побить выбранной картой
     attack_card = None
     for c, pid, role in game['table']:
         if role == 'attack' and can_beat(c, card, game['trump']):
@@ -474,7 +478,7 @@ async def defend_with_card(user_id, card_idx, game, context, chat_id):
 
     hand.remove(card)
     game['table'].append((card, user_id, 'defend'))
-    action_text = f"{game['names'][user_id]} бьёт {card}"
+    action_text = f"{game['names'][user_id]} бьёт {card} (покрывает {attack_card})"
     game['last_action'] = action_text
     await log_to_chat(chat_id, action_text, game, context)
     await update_all_players(game, context)
@@ -716,6 +720,28 @@ async def bot_turn(chat_id, context):
         else:
             await action_beaten(bot_id, game, context, chat_id)
     elif game['phase'] == 'transfer':
+        # Если у противника (атакующего) осталась только одна карта, бот не переводит
+        attacker_id = game['turn_order'][game['attacker_index']]
+        if len(game['hands'][attacker_id]) == 1:
+            # Переход в защиту
+            game['phase'] = 'defend'
+            await update_all_players(game, context)
+            # Продолжаем, как будто идёт защита
+            last_attack = next(((c, pid) for c, pid, role in reversed(game['table']) if role == 'attack'), None)
+            if not last_attack:
+                await take_cards(game, context, chat_id)
+                return
+            attack_card = last_attack[0]
+            possible = [(i, card) for i, card in enumerate(hand) if can_beat(attack_card, card, game['trump'])]
+            if possible:
+                possible.sort(key=lambda x: (CARD_VALUES[card_rank(x[1])], card_suit(x[1])))
+                idx = possible[0][0]
+                await defend_with_card(bot_id, idx, game, context, chat_id)
+            else:
+                await take_cards(game, context, chat_id)
+            return
+
+        # Иначе обычная логика перевода
         last_attack = next(((c, pid) for c, pid, role in reversed(game['table']) if role == 'attack'), None)
         if last_attack:
             attack_card = last_attack[0]
