@@ -275,7 +275,9 @@ async def send_or_update_game_message(user_id, game, context):
     if user_id == -1:
         return
 
+    # ЗАДЕРЖКА перед удалением предыдущего сообщения
     if user_id in game.get('player_messages', {}):
+        await asyncio.sleep(2)  # Даём время прочитать
         try:
             await context.bot.delete_message(chat_id=user_id, message_id=game['player_messages'][user_id])
         except:
@@ -291,7 +293,6 @@ async def send_or_update_game_message(user_id, game, context):
     attacker_id = game['turn_order'][attacker_idx]
     defender_id = game['turn_order'][defender_idx]
 
-    # Последнее действие
     last_action = game.get('last_action', '')
 
     if table:
@@ -323,7 +324,7 @@ async def send_or_update_game_message(user_id, game, context):
     elif phase == 'transfer':
         if defender_id == user_id:
             if game.get('pending_transfer') == user_id:
-                status = "Выберите карту для перевода (того же достоинства, что и заходящая)."
+                status = "Выберите карту для перевода (того же достоинства, что и последняя заходящая)."
             else:
                 status = "Можно перевести (кнопка «Перевести»), отбиться или забрать."
         else:
@@ -419,12 +420,13 @@ async def durak_card_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def handle_transfer_card(user_id, card_idx, game, context, chat_id):
     hand = game['hands'][user_id]
     card = hand[card_idx]
-    first_attack = next((c for c, pid, role in game['table'] if role == 'attack'), None)
-    if not first_attack or card_rank(card) != card_rank(first_attack[0]):
-        await context.bot.send_message(user_id, 'Этой картой нельзя перевести. Выберите карту того же достоинства, что и заходящая.')
+    # Ищем ПОСЛЕДНЮЮ атакующую карту
+    last_attack = next(((c, pid) for c, pid, role in reversed(game['table']) if role == 'attack'), None)
+    if not last_attack or card_rank(card) != card_rank(last_attack[0]):
+        await context.bot.send_message(user_id, 'Этой картой нельзя перевести. Выберите карту того же достоинства, что и последняя заходящая.')
         return
     game['pending_transfer'] = None
-    await transfer_with_card(user_id, card_idx, game, context, chat_id)
+    await transfer_with_card(user_id, card_idx, game, context, chat_id, last_attack[0])
 
 async def attack_with_card(user_id, card_idx, game, context, chat_id):
     game['pending_transfer'] = None
@@ -514,7 +516,7 @@ async def throw_with_card(user_id, card_idx, game, context, chat_id):
     else:
         reset_timer(game, defender_id, context, chat_id)
 
-async def transfer_with_card(user_id, card_idx, game, context, chat_id):
+async def transfer_with_card(user_id, card_idx, game, context, chat_id, attack_card=None):
     game['pending_transfer'] = None
     if game['mode'] != 'transfer' or game['phase'] != 'transfer':
         await context.bot.send_message(user_id, 'Сейчас нельзя перевести.')
@@ -524,8 +526,13 @@ async def transfer_with_card(user_id, card_idx, game, context, chat_id):
         return
     hand = game['hands'][user_id]
     card = hand[card_idx]
-    first_attack = next((c for c, pid, role in game['table'] if role == 'attack'), None)
-    if not first_attack or card_rank(card) != card_rank(first_attack[0]):
+    if attack_card is None:
+        # fallback
+        last_attack = next(((c, pid) for c, pid, role in reversed(game['table']) if role == 'attack'), None)
+        if not last_attack:
+            return
+        attack_card = last_attack[0]
+    if card_rank(card) != card_rank(attack_card):
         await context.bot.send_message(user_id, 'Перевести можно только картой того же достоинства.')
         return
     hand.remove(card)
@@ -573,7 +580,7 @@ async def action_transfer(user_id, game, context, chat_id):
         return
     game['pending_transfer'] = user_id
     await send_or_update_game_message(user_id, game, context)
-    await context.bot.send_message(user_id, 'Выберите карту для перевода (того же достоинства, что и заходящая).')
+    await context.bot.send_message(user_id, 'Выберите карту для перевода (того же достоинства, что и последняя заходящая).')
 
 async def take_cards(game, context, chat_id):
     defender_id = game['turn_order'][game['defender_index']]
@@ -668,7 +675,7 @@ async def bot_turn(chat_id, context):
                 await send_or_update_game_message(uid, game, context)
             except:
                 pass
-    await asyncio.sleep(1.5)
+    await asyncio.sleep(4.5)  # УВЕЛИЧЕНО ДО 4.5 секунд
 
     bot_id = -1
     hand = game['hands'][bot_id]
@@ -716,7 +723,7 @@ async def bot_turn(chat_id, context):
                 chosen = None
             if chosen:
                 idx = hand.index(chosen)
-                await transfer_with_card(bot_id, idx, game, context, chat_id)
+                await transfer_with_card(bot_id, idx, game, context, chat_id, attack_card)
                 return
             possible_def = [c for c in hand if can_beat(attack_card, c, game['trump'])]
             if possible_def:
