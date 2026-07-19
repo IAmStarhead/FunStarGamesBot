@@ -1,3 +1,4 @@
+import os
 import random
 import asyncio
 import logging
@@ -16,6 +17,8 @@ PAYOUTS = {
     '🍇': 5,
     '🔔': 3
 }
+
+GIF_PATH = "assets/spin.gif"  # путь к анимации прокрутки
 
 def spin_result():
     return [[random.choice(SYMBOLS) for _ in range(3)] for _ in range(3)]
@@ -126,14 +129,30 @@ async def slots_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Удаляем исходное сообщение
         await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
 
-        # Отправляем заставку с анимированным эмодзи
-        splash_msg = await context.bot.send_message(
-            chat_id=chat_id,
-            text="🎰 Крутим... 🎰",
-            message_thread_id=thread_id
-        )
-        await asyncio.sleep(7.5)  # УВЕЛИЧЕНО ДО 7.5 СЕКУНД
-        await context.bot.delete_message(chat_id=chat_id, message_id=splash_msg.message_id)
+        # Отправляем GIF с анимацией (или текст, если файла нет)
+        gif_msg = None
+        if os.path.exists(GIF_PATH):
+            with open(GIF_PATH, 'rb') as anim:
+                gif_msg = await context.bot.send_animation(
+                    chat_id=chat_id,
+                    animation=anim,
+                    caption="🎰 Крутим...",
+                    message_thread_id=thread_id
+                )
+        else:
+            gif_msg = await context.bot.send_message(
+                chat_id=chat_id,
+                text="🎰 Крутим... (GIF не найден)",
+                message_thread_id=thread_id
+            )
+
+        await asyncio.sleep(7.5)  # увеличенная задержка
+
+        if gif_msg:
+            try:
+                await context.bot.delete_message(chat_id=chat_id, message_id=gif_msg.message_id)
+            except:
+                pass
 
         # Финальный результат
         final_grid = spin_result()
