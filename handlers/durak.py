@@ -295,7 +295,6 @@ async def send_or_update_game_message(user_id, game, context):
     else:
         table_text = "Стол пуст.\n"
 
-    # Определяем статус (кто сейчас действует)
     current_player = get_current_player_id(game)
     if current_player == user_id:
         if phase == 'attack':
@@ -350,7 +349,6 @@ async def send_or_update_game_message(user_id, game, context):
         text += f"📌 {last_action}\n\n"
     text += f"{table_text}\nВаша рука:\n{status}"
 
-    # Редактируем существующее сообщение или отправляем новое
     if user_id in game.get('player_messages', {}):
         try:
             await context.bot.edit_message_text(
@@ -362,7 +360,6 @@ async def send_or_update_game_message(user_id, game, context):
             return
         except Exception as e:
             logger.warning(f"Не удалось отредактировать сообщение для {user_id}: {e}")
-            # Если не удалось, удаляем и отправляем новое ниже
             try:
                 await context.bot.delete_message(chat_id=user_id, message_id=game['player_messages'][user_id])
             except:
@@ -463,14 +460,18 @@ async def defend_with_card(user_id, card_idx, game, context, chat_id):
     game['pending_transfer'] = None
     hand = game['hands'][user_id]
     card = hand[card_idx]
-    last_attack = next(((c, pid) for c, pid, role in reversed(game['table']) if role == 'attack'), None)
-    if not last_attack:
-        await context.bot.send_message(user_id, 'Нечего бить.')
+
+    # Ищем любую атакующую карту на столе, которую можно побить выбранной картой
+    attack_card = None
+    for c, pid, role in game['table']:
+        if role == 'attack' and can_beat(c, card, game['trump']):
+            attack_card = c
+            break
+
+    if attack_card is None:
+        await context.bot.send_message(user_id, 'Этой картой нечего бить.')
         return
-    attack_card = last_attack[0]
-    if not can_beat(attack_card, card, game['trump']):
-        await context.bot.send_message(user_id, 'Эта карта не бьёт.')
-        return
+
     hand.remove(card)
     game['table'].append((card, user_id, 'defend'))
     action_text = f"{game['names'][user_id]} бьёт {card}"
@@ -680,9 +681,8 @@ async def bot_turn(chat_id, context):
     game = durak_games[chat_id]
     if game['state'] != 'playing':
         return
-    # Обновим сообщения, чтобы игрок видел "Ходит Бот"
     await update_all_players(game, context)
-    await asyncio.sleep(2)  # небольшая пауза
+    await asyncio.sleep(2)
 
     bot_id = -1
     hand = game['hands'][bot_id]
