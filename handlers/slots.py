@@ -1,3 +1,4 @@
+import os
 import random
 import asyncio
 import logging
@@ -16,6 +17,8 @@ PAYOUTS = {
     '🍇': 5,
     '🔔': 3
 }
+
+GIF_PATH = "assets/spin.gif"  # путь к анимации прокрутки
 
 def spin_result():
     return [[random.choice(SYMBOLS) for _ in range(3)] for _ in range(3)]
@@ -65,7 +68,8 @@ async def start_slots(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'message_id': msg.message_id,
         'chat_id': chat.id,
         'thread_id': thread_id,
-        'bet': bet
+        'bet': bet,
+        'bet_locked': False   # True, если ставка уже выбрана и кнопки выбора убраны
     }
 
 async def slots_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -87,13 +91,12 @@ async def slots_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith('slots_bet_'):
         new_bet = int(data.split('_')[2])
         slots_state['bet'] = new_bet
+        slots_state['bet_locked'] = True  # скрываем остальные ставки
         await query.answer(f'Ставка изменена на {new_bet} фишек.')
         balance = get_balance(user.id)
         grid = spin_result()
+        # Показываем только кнопку "Крутить"
         keyboard = [
-            [InlineKeyboardButton('10', callback_data='slots_bet_10'),
-             InlineKeyboardButton('25', callback_data='slots_bet_25'),
-             InlineKeyboardButton('50', callback_data='slots_bet_50')],
             [InlineKeyboardButton('🎰 Крутить', callback_data='slots_spin')]
         ]
         text = (
@@ -102,14 +105,18 @@ async def slots_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"{format_slots(grid)}\n"
             f"──────────────\n"
             f"Ставка: {new_bet} фишек\n"
-            f"Баланс: {balance} фишек"
+            f"Баланс: {balance} фишек\n"
+            f"Ожидайте прокрутку..."
         )
-        await context.bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=message_id,
-            text=text,
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        try:
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        except Exception as e:
+            logger.warning(f"Не удалось обновить выбор ставки: {e}")
         return
 
     elif data == 'slots_spin':
@@ -123,17 +130,38 @@ async def slots_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         add_balance(user.id, -bet)
         balance = get_balance(user.id)
 
-        # Удаляем исходное сообщение
-        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        # Удаляем текущее сообщение
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        except Exception as e:
+            logger.warning(f"Не удалось удалить сообщение перед GIF: {e}")
 
-        # Отправляем заставку с анимированным эмодзи
-        splash_msg = await context.bot.send_message(
-            chat_id=chat_id,
-            text="🎰 Крутим... 🎰",
-            message_thread_id=thread_id
-        )
-        await asyncio.sleep(2)  # имитация вращения
-        await context.bot.delete_message(chat_id=chat_id, message_id=splash_msg.message_id)
+        # Отправляем GIF с прокруткой
+        gif_msg = None
+        if os.path.exists(GIF_PATH):
+            with open(GIF_PATH, 'rb') as anim:
+                gif_msg = await context.bot.send_animation(
+                    chat_id=chat_id,
+                    animation=anim,
+                    caption="🎰 Крутим...",
+                    message_thread_id=thread_id
+                )
+        else:
+            # Заглушка, если файла нет
+            gif_msg = await context.bot.send_message(
+                chat_id=chat_id,
+                text="🎰 Крутим... (GIF не найден)",
+                message_thread_id=thread_id
+            )
+
+        await asyncio.sleep(2.5)  # даём проиграться анимации
+
+        # Удаляем GIF (или текстовую заглушку)
+        if gif_msg:
+            try:
+                await context.bot.delete_message(chat_id=chat_id, message_id=gif_msg.message_id)
+            except:
+                pass
 
         # Финальный результат
         final_grid = spin_result()
@@ -148,6 +176,7 @@ async def slots_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             new_balance = get_balance(user.id)
             result_text = "😔 Нет выигрыша.\n"
 
+        # Возвращаем полную клавиатуру (все ставки) для следующего раунда
         keyboard = [
             [InlineKeyboardButton('10', callback_data='slots_bet_10'),
              InlineKeyboardButton('25', callback_data='slots_bet_25'),
@@ -165,16 +194,18 @@ async def slots_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Баланс: {new_balance} фишек"
         )
 
-        msg = await context.bot.send_message(
+        # Отправляем результат как новое сообщение
+        new_msg = await context.bot.send_message(
             chat_id=chat_id,
             text=final_text,
             reply_markup=InlineKeyboardMarkup(keyboard),
             message_thread_id=thread_id
         )
 
-        # Обновляем состояние для нового сообщения
-        slots_state['message_id'] = msg.message_id
+        # Обновляем состояние в user_data
+        slots_state['message_id'] = new_msg.message_id
         slots_state['bet'] = bet
+        slots_state['bet_locked'] = False
         return
 
 def register_handlers(app):
