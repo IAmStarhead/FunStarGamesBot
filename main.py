@@ -22,7 +22,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- Логирование только обращений к боту ---
 async def log_update(update: Update, context):
     if update.message and update.message.text:
         user = update.message.from_user
@@ -39,7 +38,6 @@ async def log_update(update: Update, context):
         user = update.callback_query.from_user
         logger.info("Нажата кнопка %s пользователем %s (@%s)", update.callback_query.data, user.full_name, user.username)
 
-# --- Команды баланса и переводов ---
 async def balance_command(update: Update, context):
     if context.args:
         username = context.args[0]
@@ -78,7 +76,6 @@ async def transfer_command(update: Update, context):
     else:
         await update.message.reply_text("Недостаточно средств.")
 
-# --- Бот ---
 def run_bot():
     token = os.environ["BOT_TOKEN"]
     app = Application.builder().token(token).build()
@@ -86,7 +83,6 @@ def run_bot():
     app.add_handler(MessageHandler(filters.TEXT, log_update), group=999)
     app.add_handler(CallbackQueryHandler(log_update, pattern=None), group=999)
 
-    # Блэкджек
     blackjack.register_handlers(app)
     app.add_handler(CommandHandler("bj", blackjack.start_lobby))
     app.add_handler(
@@ -96,7 +92,6 @@ def run_bot():
         )
     )
 
-    # Дурак
     durak.register_handlers(app)
     app.add_handler(CommandHandler("durak", lambda u, c: durak.durak_start(u, c, 'throw')))
     app.add_handler(
@@ -105,8 +100,8 @@ def run_bot():
             durak.text_durak
         )
     )
+    app.add_handler(CommandHandler("reset_durak", durak.reset_durak))
 
-    # Слоты
     slots.register_handlers(app)
     app.add_handler(CommandHandler("slots", slots.start_slots))
     app.add_handler(
@@ -116,7 +111,6 @@ def run_bot():
         )
     )
 
-    # Баланс и переводы
     app.add_handler(CommandHandler("balance", balance_command))
     app.add_handler(CommandHandler("transfer", transfer_command))
     app.add_handler(
@@ -126,7 +120,6 @@ def run_bot():
         )
     )
 
-    # Стартовое меню и приветствия
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", button_handler))
     app.add_handler(
@@ -143,7 +136,6 @@ def run_bot():
     logger.info("Запускаю бота...")
     app.run_polling()
 
-# --- Веб-заглушка ---
 class PingHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
