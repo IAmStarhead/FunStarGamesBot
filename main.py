@@ -93,7 +93,18 @@ def run_bot():
     )
 
     durak.register_handlers(app)
-    app.add_handler(CommandHandler("durak", lambda u, c: durak.durak_start(u, c, 'throw')))
+    async def durak_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("Подкидной", callback_data="durak_mode_throw")],
+        [InlineKeyboardButton("Переводной", callback_data="durak_mode_transfer")],
+        [InlineKeyboardButton("Простой", callback_data="durak_mode_simple")],
+    ]
+    await update.message.reply_text(
+        "Выберите режим дурака:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+    app.add_handler(CommandHandler("durak", durak_command))
     app.add_handler(
         MessageHandler(
             filters.TEXT & filters.Regex(r"(?i)^дурак"),
