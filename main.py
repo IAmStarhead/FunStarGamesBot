@@ -3,7 +3,7 @@ import time
 import threading
 import logging
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -76,6 +76,17 @@ async def transfer_command(update: Update, context):
     else:
         await update.message.reply_text("Недостаточно средств.")
 
+async def durak_command(update: Update, context):
+    keyboard = [
+        [InlineKeyboardButton("Подкидной", callback_data="durak_mode_throw")],
+        [InlineKeyboardButton("Переводной", callback_data="durak_mode_transfer")],
+        [InlineKeyboardButton("Простой", callback_data="durak_mode_simple")],
+    ]
+    await update.message.reply_text(
+        "Выберите режим дурака:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
 def run_bot():
     token = os.environ["BOT_TOKEN"]
     app = Application.builder().token(token).build()
@@ -93,17 +104,6 @@ def run_bot():
     )
 
     durak.register_handlers(app)
-    async def durak_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("Подкидной", callback_data="durak_mode_throw")],
-        [InlineKeyboardButton("Переводной", callback_data="durak_mode_transfer")],
-        [InlineKeyboardButton("Простой", callback_data="durak_mode_simple")],
-    ]
-    await update.message.reply_text(
-        "Выберите режим дурака:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
     app.add_handler(CommandHandler("durak", durak_command))
     app.add_handler(
         MessageHandler(
@@ -111,7 +111,6 @@ def run_bot():
             durak.text_durak
         )
     )
-    app.add_handler(CommandHandler("reset_durak", durak.reset_durak))
 
     slots.register_handlers(app)
     app.add_handler(CommandHandler("slots", slots.start_slots))
