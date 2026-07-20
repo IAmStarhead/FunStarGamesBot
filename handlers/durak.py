@@ -5,6 +5,7 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 from wallet import get_balance, add_balance
+from game_manager import get_active_game
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +57,13 @@ def can_beat(attacking_card, defending_card, trump):
 async def durak_start(update: Update, context: ContextTypes.DEFAULT_TYPE, mode='throw'):
     chat = update.effective_chat
     thread_id = update.effective_message.message_thread_id if update.effective_message else None
-    logger.info(f"durak_start called for chat {chat.id}, mode={mode}, thread_id={thread_id}")
 
-    if chat.id in durak_games and durak_games[chat.id]['state'] != 'finished':
+    # Проверка: не занят ли стол другой игрой
+    active = get_active_game(chat.id)
+    if active and active != 'Дурак':   # если уже идёт дурак, то мы просто пересоздаём лобби? Лучше запретить и дурак, если он уже есть.
         await context.bot.send_message(
             chat.id,
-            'Игра в дурака уже идёт. Дождитесь завершения.',
+            f"В этом чате уже идёт игра «{active}». Дождитесь её завершения или сбросьте командой /reset_durak.",
             message_thread_id=thread_id
         )
         return
