@@ -42,7 +42,6 @@ def hand_display(hand):
 def card_rank(card):
     return card[:-1]
 
-# Персонажи дилера
 DEALERS = [
     {"name": "Сильвестр", "emoji": "👨‍💼", "phrases": {
         "start": ["Делайте ваши ставки, господа!", "Начнём игру!", "Удачи за столом!"],
@@ -117,7 +116,6 @@ async def start_lobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     thread_id = update.effective_message.message_thread_id if update.effective_message else None
 
-    # Проверка, не занят ли чат дураком
     try:
         from handlers.durak import durak_games
         if chat.id in durak_games and durak_games[chat.id].get('state') != 'finished':
@@ -325,9 +323,10 @@ async def start_game(chat_id, context):
         hand = game['hands'][uid][0]
         if len(hand) == 2 and hand_value(hand) == 21:
             game['status'][uid] = ['blackjack']
+            bj_msg = dealer_say(game, 'blackjack')
             await context.bot.send_message(
                 chat_id,
-                f"{dealer_prefix(game)}: @{game['names'][uid]} — блэкджек!",
+                f"{dealer_prefix(game)}: {bj_msg}",
                 message_thread_id=thread_id
             )
     await next_player_turn(chat_id, context)
@@ -431,7 +430,8 @@ async def hit(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await finish_current_hand(chat_id, user_id, context)
     elif total > 21:
         game['status'][user_id][hand_idx] = 'busted'
-        await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: @{name} берёт {card} — перебор ({total}) 💥")
+        bust_msg = dealer_say(game, 'bust')
+        await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: {bust_msg}")
         await finish_current_hand(chat_id, user_id, context)
     else:
         await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: @{name} берёт {card} — теперь {hand_display(hand)}")
@@ -500,7 +500,8 @@ async def double_down(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: @{name} удваивает ставку до {game['bets'][user_id]} и получает {card} — {hand_display(hand)}")
     if total > 21:
         game['status'][user_id][hand_idx] = 'busted'
-        await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: @{name} перебор!")
+        bust_msg = dealer_say(game, 'bust')
+        await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: {bust_msg}")
     else:
         game['status'][user_id][hand_idx] = 'stood'
     await finish_current_hand(chat_id, user_id, context)
@@ -536,8 +537,9 @@ async def split(update: Update, context: ContextTypes.DEFAULT_TYPE):
     game['status'][user_id] = ['playing', 'playing']
     game['current_hand'][user_id] = 0
     game['bets'][user_id] *= 2
+    split_msg = dealer_say(game, 'split')
     await query.message.delete()
-    await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: @{game['names'][user_id]} делает сплит! Теперь две руки.")
+    await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: {split_msg}")
     await send_turn_message(chat_id, user_id, context)
 
 async def surrender(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -621,16 +623,20 @@ async def end_game(chat_id, context):
                 if dealer_bust:
                     win = bet_per_hand * 2
                     add_balance(uid, win)
-                    results.append(f'@{name}: {total} (рука {i+1}) — победа (дилер перебрал), +{win} фишек.')
+                    win_msg = dealer_say(game, 'win')
+                    results.append(f'@{name}: {total} (рука {i+1}) — {win_msg} +{win} фишек.')
                 elif total > dealer_total:
                     win = bet_per_hand * 2
                     add_balance(uid, win)
-                    results.append(f'@{name}: {total} (рука {i+1}) — победа, +{win} фишек.')
+                    win_msg = dealer_say(game, 'win')
+                    results.append(f'@{name}: {total} (рука {i+1}) — {win_msg} +{win} фишек.')
                 elif total < dealer_total:
-                    results.append(f'@{name}: {total} (рука {i+1}) — поражение, потеря {bet_per_hand} фишек.')
+                    lose_msg = dealer_say(game, 'lose')
+                    results.append(f'@{name}: {total} (рука {i+1}) — {lose_msg}')
                 else:
+                    push_msg = dealer_say(game, 'push')
                     add_balance(uid, bet_per_hand)
-                    results.append(f'@{name}: {total} (рука {i+1}) — ничья, возврат {bet_per_hand} фишек.')
+                    results.append(f'@{name}: {total} (рука {i+1}) — {push_msg}')
 
     dealer_display = hand_display(game['dealer_hand'])
     text = f"{dealer_prefix(game)}: 🏆 Результаты:\n" + '\n'.join(results)
@@ -681,7 +687,6 @@ async def new_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
         del games[chat_id]
     await query.message.reply_text('Новая игра. Напишите "блэкджек" или /bj для старта.')
 
-# --- Сброс игры ---
 async def reset_bj(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.username and update.effective_user.username.lower() == 'iamstarhead':
         chat_id = update.effective_chat.id
@@ -693,7 +698,6 @@ async def reset_bj(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Нет доступа.")
 
-# --- Запуск через текст ---
 async def text_blackjack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     chat = update.effective_chat
@@ -708,7 +712,6 @@ async def text_blackjack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if mentioned:
         await start_lobby(update, context)
 
-# --- Регистрация обработчиков ---
 def register_handlers(app):
     app.add_handler(CallbackQueryHandler(lobby_button, pattern='^bj_(bet_|join|leave|start|dealer|set_dealer_|back_to_lobby)'))
     app.add_handler(CallbackQueryHandler(hit, pattern='^bj_hit_'))
