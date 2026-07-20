@@ -6,7 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 from wallet import get_balance, add_balance
 from game_manager import get_active_game
-from queue_manager import add_to_queue, pop_next_game, get_queue
+from queue_manager import add_to_queue, pop_next_game
 from handlers import slots
 
 logger = logging.getLogger(__name__)
@@ -144,17 +144,22 @@ async def durak_lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id = query.message.chat.id
     data = query.data
 
-    # Обработка кнопок очереди (если нажали "Да" или "Нет")
+    # Обработка кнопок очереди
     if data == 'queue_durak':
         success, msg = add_to_queue(chat_id, 'дурак', mode='throw', bet=25, player_id=query.from_user.id)
         await query.edit_message_text(msg)
         return
-elif data == 'queue_cancel':
-    await query.edit_message_text("Ок, ожидайте.")
-    return
-elif data == 'queue_play_slots':
-    await slots.start_slots(update, context)
-    return
+    if data == 'queue_cancel':
+        await query.edit_message_text("Ок, ожидайте.")
+        return
+    if data == 'queue_play_slots':
+        await slots.start_slots(update, context)
+        return
+
+    game = durak_games.get(chat_id)
+    if not game or game['state'] != 'lobby':
+        await query.edit_message_text('Лобби устарело.')
+        return
 
     user = query.from_user
 
@@ -164,7 +169,7 @@ elif data == 'queue_play_slots':
         await query.answer(f'Ставка: {bet} фишек.')
         await update_lobby_message(chat_id, context)
         return
-    elif data == 'durak_join':
+    if data == 'durak_join':
         if not is_activated(user.id):
             await query.answer('Сначала напишите боту в личные сообщения (откройте чат и нажмите /start).', show_alert=True)
             return
@@ -647,7 +652,6 @@ async def end_turn(game, context, chat_id, skip_attacker_change=False):
             game['state'] = 'finished'
             durak_games.pop(chat_id, None)
 
-            # Проверяем очередь
             next_game = pop_next_game(chat_id)
             if next_game:
                 asyncio.ensure_future(launch_queued_game(chat_id, next_game, context))
