@@ -109,7 +109,7 @@ def dealer_say(game, event):
 def dealer_prefix(game):
     d = game.get('dealer')
     if d:
-        return f"{d['emoji']} {d['name']}: "
+        return f"{d['emoji']} {d['name']}"
     return ""
 
 # === Лобби ===
@@ -207,15 +207,14 @@ async def lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = query.message.chat.id
     data = query.data
 
-    # Обработка кнопок очереди
     if data == 'queue_blackjack':
         success, msg = add_to_queue(chat_id, 'блэкджек', bet=10, player_id=query.from_user.id)
         await query.edit_message_text(msg)
         return
-    elif data == 'queue_cancel':
+    if data == 'queue_cancel':
         await query.edit_message_text("Ок, ожидайте.")
         return
-    elif data == 'queue_play_slots':
+    if data == 'queue_play_slots':
         await slots.start_slots(update, context)
         return
 
@@ -232,7 +231,7 @@ async def lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer(f'Ставка: {bet} фишек.')
         await update_lobby_message(chat_id, context)
         return
-    elif data == 'bj_join':
+    if data == 'bj_join':
         if 'bet_amount' not in game or game['bet_amount'] == 0:
             await query.answer('Сначала выберите ставку.', show_alert=True)
             return
@@ -258,7 +257,6 @@ async def lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.answer('Вы не за столом.', show_alert=False)
     elif data == 'bj_dealer':
-        # Показать список дилеров
         dealer_buttons = []
         for i, dealer in enumerate(DEALERS):
             dealer_buttons.append([InlineKeyboardButton(f"{dealer['emoji']} {dealer['name']}", callback_data=f'bj_set_dealer_{i}')])
@@ -319,7 +317,7 @@ async def start_game(chat_id, context):
         lines.append(f'@{game["names"][uid]}: {hand_display(hand)} (ставка {game["bets"][uid]})')
     dealer_visible = f'{game["dealer_hand"][0]} ??'
     lines.append(f'Дилер: {dealer_visible}')
-    msg_text = f"{dealer_prefix(game)}{dealer_msg}\n" + '\n'.join(lines)
+    msg_text = f"{dealer_prefix(game)}: {dealer_msg}\n" + '\n'.join(lines)
     msg = await context.bot.send_message(chat_id, msg_text, message_thread_id=thread_id)
     game['game_message_id'] = msg.message_id
 
@@ -329,7 +327,7 @@ async def start_game(chat_id, context):
             game['status'][uid] = ['blackjack']
             await context.bot.send_message(
                 chat_id,
-                f"{dealer_prefix(game)}@{game['names'][uid]} — блэкджек!",
+                f"{dealer_prefix(game)}: @{game['names'][uid]} — блэкджек!",
                 message_thread_id=thread_id
             )
     await next_player_turn(chat_id, context)
@@ -385,7 +383,7 @@ async def send_turn_message(chat_id, user_id, context):
 
     hand_info = f"Рука {hand_idx+1}/{len(game['hands'][user_id])}: " if len(game['hands'][user_id]) > 1 else ""
 
-    text = f"{dealer_prefix(game)}Ход @{name}. {hand_info}{hand_display(hand)}. Баланс: {get_balance(user_id)} фишек."
+    text = f"{dealer_prefix(game)}: Ход @{name}\n{hand_info}{hand_display(hand)}\nБаланс: {get_balance(user_id)} фишек."
     msg = await context.bot.send_message(chat_id, text, reply_markup=InlineKeyboardMarkup(keyboard), message_thread_id=game.get('thread_id'))
     game['turn_message_id'] = msg.message_id
 
@@ -429,14 +427,14 @@ async def hit(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if total == 21:
         game['status'][user_id][hand_idx] = 'stood'
-        await context.bot.send_message(chat_id, f"{dealer_prefix(game)}@{name} берёт {card} — {total} очков. Автоматическая остановка.")
+        await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: @{name} берёт {card} — {total} очков. Автоматическая остановка.")
         await finish_current_hand(chat_id, user_id, context)
     elif total > 21:
         game['status'][user_id][hand_idx] = 'busted'
-        await context.bot.send_message(chat_id, f"{dealer_prefix(game)}@{name} берёт {card} — перебор ({total}) 💥")
+        await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: @{name} берёт {card} — перебор ({total}) 💥")
         await finish_current_hand(chat_id, user_id, context)
     else:
-        await context.bot.send_message(chat_id, f"{dealer_prefix(game)}@{name} берёт {card} — теперь {hand_display(hand)}")
+        await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: @{name} берёт {card} — теперь {hand_display(hand)}")
         await send_turn_message(chat_id, user_id, context)
 
 async def stand(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -464,7 +462,7 @@ async def stand_action(chat_id, user_id, context, automatic=False):
     total = hand_value(game['hands'][user_id][hand_idx])
     name = game['names'][user_id]
     msg = f"@{name} остановился на {total}" + (' (автоматически)' if automatic else '')
-    await context.bot.send_message(chat_id, f"{dealer_prefix(game)}{msg}")
+    await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: {msg}")
     if game.get('turn_message_id'):
         try:
             await context.bot.delete_message(chat_id, game['turn_message_id'])
@@ -499,10 +497,10 @@ async def double_down(update: Update, context: ContextTypes.DEFAULT_TYPE):
     card = game['deck'].pop()
     hand.append(card)
     total = hand_value(hand)
-    await context.bot.send_message(chat_id, f"{dealer_prefix(game)}@{name} удваивает ставку до {game['bets'][user_id]} и получает {card} — {hand_display(hand)}")
+    await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: @{name} удваивает ставку до {game['bets'][user_id]} и получает {card} — {hand_display(hand)}")
     if total > 21:
         game['status'][user_id][hand_idx] = 'busted'
-        await context.bot.send_message(chat_id, f"{dealer_prefix(game)}@{name} перебор!")
+        await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: @{name} перебор!")
     else:
         game['status'][user_id][hand_idx] = 'stood'
     await finish_current_hand(chat_id, user_id, context)
@@ -539,7 +537,7 @@ async def split(update: Update, context: ContextTypes.DEFAULT_TYPE):
     game['current_hand'][user_id] = 0
     game['bets'][user_id] *= 2
     await query.message.delete()
-    await context.bot.send_message(chat_id, f"{dealer_prefix(game)}@{game['names'][user_id]} делает сплит! Теперь две руки.")
+    await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: @{game['names'][user_id]} делает сплит! Теперь две руки.")
     await send_turn_message(chat_id, user_id, context)
 
 async def surrender(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -560,7 +558,7 @@ async def surrender(update: Update, context: ContextTypes.DEFAULT_TYPE):
     hand_idx = game['current_hand'][user_id]
     game['status'][user_id][hand_idx] = 'surrender'
     name = game['names'][user_id]
-    await context.bot.send_message(chat_id, f"{dealer_prefix(game)}@{name} сдаётся.")
+    await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: @{name} сдаётся.")
     await query.message.delete()
     await finish_current_hand(chat_id, user_id, context)
 
@@ -586,15 +584,15 @@ async def dealer_turn(chat_id, context):
     game['state'] = 'dealer'
     dhand = game['dealer_hand']
     thread_id = game.get('thread_id')
-    await context.bot.send_message(chat_id, f"{dealer_prefix(game)}🔍 Дилер вскрывает: {hand_display(dhand)}", message_thread_id=thread_id)
+    await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: 🔍 Дилер вскрывает: {hand_display(dhand)}", message_thread_id=thread_id)
     await asyncio.sleep(1)
     while hand_value(dhand) < 17:
         if not game['deck']:
-            await context.bot.send_message(chat_id, f"{dealer_prefix(game)}Карты закончились. Дилер останавливается.", message_thread_id=thread_id)
+            await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: Карты закончились. Дилер останавливается.", message_thread_id=thread_id)
             break
         card = game['deck'].pop()
         dhand.append(card)
-        await context.bot.send_message(chat_id, f"{dealer_prefix(game)}Дилер берёт {card} — {hand_value(dhand)} очков", message_thread_id=thread_id)
+        await context.bot.send_message(chat_id, f"{dealer_prefix(game)}: Дилер берёт {card} — {hand_value(dhand)} очков", message_thread_id=thread_id)
         await asyncio.sleep(1)
     await end_game(chat_id, context)
 
@@ -635,19 +633,45 @@ async def end_game(chat_id, context):
                     results.append(f'@{name}: {total} (рука {i+1}) — ничья, возврат {bet_per_hand} фишек.')
 
     dealer_display = hand_display(game['dealer_hand'])
-    text = f"{dealer_prefix(game)}🏆 Результаты:\n" + '\n'.join(results)
+    text = f"{dealer_prefix(game)}: 🏆 Результаты:\n" + '\n'.join(results)
     text += f'\nДилер: {dealer_display}'
-    keyboard = [[InlineKeyboardButton('Новая игра', callback_data='bj_new_game')]]
+    keyboard = [
+        [InlineKeyboardButton('Следующий раунд (–10 фишек)', callback_data='bj_next_round')],
+        [InlineKeyboardButton('Новая игра', callback_data='bj_new_game')]
+    ]
     await context.bot.send_message(chat_id, text, reply_markup=InlineKeyboardMarkup(keyboard), message_thread_id=game.get('thread_id'))
 
-    del games[chat_id]
-    next_game = pop_next_game(chat_id)
-    if next_game:
-        await context.bot.send_message(
-            chat_id,
-            f"Очередь подошла! Запускаем {next_game['game']}. Напишите /bj или используйте кнопку меню.",
-            message_thread_id=game.get('thread_id')
-        )
+async def next_round(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    chat_id = query.message.chat.id
+    game = games.get(chat_id)
+    if not game or game['state'] != 'finished':
+        await query.edit_message_text('Нет активной игры.')
+        return
+
+    players_to_keep = []
+    for uid in game['players']:
+        if get_balance(uid) >= 10:
+            add_balance(uid, -10)
+            game['bets'][uid] = 10
+            players_to_keep.append(uid)
+        else:
+            await context.bot.send_message(
+                chat_id,
+                f'@{game["names"][uid]} исключён: недостаточно фишек.',
+                message_thread_id=game.get('thread_id')
+            )
+    if len(players_to_keep) == 0:
+        await query.edit_message_text('Ни у кого нет фишек для продолжения. Игра окончена.')
+        del games[chat_id]
+        return
+
+    game['players'] = players_to_keep
+    game['names'] = {uid: game['names'][uid] for uid in players_to_keep}
+    game['bets'] = {uid: game['bets'][uid] for uid in players_to_keep}
+
+    await start_game(chat_id, context)
 
 async def new_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -692,4 +716,5 @@ def register_handlers(app):
     app.add_handler(CallbackQueryHandler(double_down, pattern='^bj_double_'))
     app.add_handler(CallbackQueryHandler(split, pattern='^bj_split_'))
     app.add_handler(CallbackQueryHandler(surrender, pattern='^bj_surrender_'))
+    app.add_handler(CallbackQueryHandler(next_round, pattern='^bj_next_round$'))
     app.add_handler(CallbackQueryHandler(new_game, pattern='^bj_new_game$'))
