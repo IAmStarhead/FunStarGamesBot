@@ -4,6 +4,7 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from wallet import get_balance, add_balance
+from game_manager import get_active_game
 
 logger = logging.getLogger(__name__)
 
@@ -121,9 +122,16 @@ async def start_lobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     thread_id = update.effective_message.message_thread_id if update.effective_message else None
 
-    if chat.id in games and games[chat.id]['state'] != 'finished':
-        await context.bot.send_message(chat.id, 'Игра уже идёт. Дождитесь завершения.', message_thread_id=thread_id)
+    active = get_active_game(chat.id)
+    if active and active != 'Блэкджек':   # если уже идёт блэкджек, то новое лобби не создаём (можно разрешить пересоздавать, но лучше запретить, чтобы не плодить столы)
+        await context.bot.send_message(
+            chat.id,
+            f"В этом чате уже идёт игра «{active}». Дождитесь её завершения или используйте команду сброса.",
+            message_thread_id=thread_id
+        )
         return
+
+    # ... остальной код
 
     games[chat.id] = {
         'players': [],
