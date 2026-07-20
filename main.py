@@ -15,12 +15,18 @@ from telegram.ext import (
 from handlers.start import start_command, hello_handler, button_handler
 from handlers import blackjack, durak, slots
 from wallet import get_balance, transfer, get_user_id_by_username, update_username
+from queue_manager import get_queue
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+
+async def queue_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    queue_text = get_queue(chat_id)
+    await update.message.reply_text(f"Текущая очередь:\n{queue_text}")
 
 async def log_update(update: Update, context):
     if update.message and update.message.text:
@@ -129,7 +135,8 @@ def run_bot():
             balance_command
         )
     )
-
+    
+    app.add_handler(CommandHandler("queue", queue_command))
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", button_handler))
     app.add_handler(
