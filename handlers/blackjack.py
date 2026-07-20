@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 games = {}
 
-# Колода и подсчёт
 SUITS = ['♠', '♥', '♦', '♣']
 RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 
@@ -46,77 +45,69 @@ def card_rank(card):
 
 # Персонажи дилера
 DEALERS = [
-    {"name": "Сильвестр", "emoji": "👨‍💼",
-     "phrases": {
-         "start": ["Делайте ваши ставки, господа!", "Начнём игру!", "Удачи за столом!"],
-         "blackjack": ["Блэкджек! Поздравляю, везунчик!", "Блэкджек! Сегодня ваш день!"],
-         "bust": ["Перебор! Увы, но банк мой.", "Перебор! Попробуйте ещё раз."],
-         "win": ["Вы выиграли! Забирайте свой выигрыш.", "Поздравляю, выигрыш ваш!"],
-         "push": ["Ничья. Остаёмся при своих.", "Ничья, все довольны."],
-         "lose": ["Дилер выигрывает. Повезёт в следующий раз.", "Крупье забирает банк."],
-         "split": ["Разделяем карты. Удваиваем шансы!", "Сплит! Интересный ход."]
-     }},
-    {"name": "Гена", "emoji": "🧔",
-     "phrases": {
-         "start": ["Поехали!", "Ставки сделаны, ставок больше нет!", "Играем по-крупному!"],
-         "blackjack": ["Ого! Блэкджек!", "Двадцать одно! Поздравляю."],
-         "bust": ["Перебор. Сочувствую.", "Многовато, друг."],
-         "win": ["Ваша взяла! Забирайте.", "Победа за вами."],
-         "push": ["Ничья, бывает.", "Разошлись миром."],
-         "lose": ["Увы, проигрыш.", "Дилер побеждает."],
-         "split": ["Сплит! Удачи с двумя руками.", "Разделили, теперь играем вдвойне."]
-     }},
-    {"name": "Нина", "emoji": "👩‍💼",
-     "phrases": {
-         "start": ["Приятной игры!", "Ставки, пожалуйста.", "Да начнётся игра!"],
-         "blackjack": ["Блэкджек! Великолепно!", "Идеально! Блэкджек!"],
-         "bust": ["Перебор. Увы.", "Слишком много, проигрыш."],
-         "win": ["Ваш выигрыш, поздравляю!", "Вы сегодня в ударе!"],
-         "push": ["Ничья. Никто не выиграл.", "Поровну."],
-         "lose": ["Дилер выигрывает.", "Не расстраивайтесь, повезёт в другой раз."],
-         "split": ["Сплит! Интересное решение.", "Две руки — двойной азарт."]
-     }},
-    {"name": "Джесси", "emoji": "👩‍🦰",
-     "phrases": {
-         "start": ["Погнали!", "Ставки на стол!", "Удачи, господа!"],
-         "blackjack": ["Блэкджек! Просто бомба!", "Натуральная двадцать одно!"],
-         "bust": ["Ой, перебор. Сочувствую.", "Многовато, приятель."],
-         "win": ["Ваша взяла! Круто!", "Поздравляю с победой!"],
-         "push": ["Ничья, бывает.", "Остаёмся при своих."],
-         "lose": ["Дилер выиграл. Не повезло.", "Моя взяла!"],
-         "split": ["Сплит! Давайте удвоим!", "Разделили карты, теперь интереснее."]
-     }},
-    {"name": "Рамзес", "emoji": "👨‍🦳",
-     "phrases": {
-         "start": ["Приступим.", "Ставки приняты.", "Играем."],
-         "blackjack": ["Блэкджек. Поздравляю.", "Двадцать одно. Заслуженно."],
-         "bust": ["Перебор. Проигрыш.", "Слишком много."],
-         "win": ["Вы выиграли. Поздравляю.", "Ваша победа."],
-         "push": ["Ничья.", "Равный счёт."],
-         "lose": ["Дилер победил.", "В этот раз удача не на вашей стороне."],
-         "split": ["Сплит. Хороший ход.", "Разделяем."]
-     }},
-    {"name": "Ева", "emoji": "👩",
-     "phrases": {
-         "start": ["Удачи за столом!", "Ставки сделаны.", "Начинаем!"],
-         "blackjack": ["Блэкджек! Браво!", "Двадцать одно! Отлично!"],
-         "bust": ["Перебор. Увы.", "Не повезло."],
-         "win": ["Ваш выигрыш! Поздравляю!", "Победа!"],
-         "push": ["Ничья.", "Поровну, бывает."],
-         "lose": ["Дилер выигрывает.", "Крупье забирает."],
-         "split": ["Сплит! Удваиваем.", "Разделили, играем дальше."]
-     }}
+    {"name": "Сильвестр", "emoji": "👨‍💼", "phrases": {
+        "start": ["Делайте ваши ставки, господа!", "Начнём игру!", "Удачи за столом!"],
+        "blackjack": ["Блэкджек! Поздравляю, везунчик!", "Блэкджек! Сегодня ваш день!"],
+        "bust": ["Перебор! Увы, но банк мой.", "Перебор! Попробуйте ещё раз."],
+        "win": ["Вы выиграли! Забирайте свой выигрыш.", "Поздравляю, выигрыш ваш!"],
+        "push": ["Ничья. Остаёмся при своих.", "Ничья, все довольны."],
+        "lose": ["Дилер выигрывает. Повезёт в следующий раз.", "Крупье забирает банк."],
+        "split": ["Разделяем карты. Удваиваем шансы!", "Сплит! Интересный ход."]
+    }},
+    {"name": "Гена", "emoji": "🧔", "phrases": {
+        "start": ["Поехали!", "Ставки сделаны, ставок больше нет!", "Играем по-крупному!"],
+        "blackjack": ["Ого! Блэкджек!", "Двадцать одно! Поздравляю."],
+        "bust": ["Перебор. Сочувствую.", "Многовато, друг."],
+        "win": ["Ваша взяла! Забирайте.", "Победа за вами."],
+        "push": ["Ничья, бывает.", "Разошлись миром."],
+        "lose": ["Увы, проигрыш.", "Дилер побеждает."],
+        "split": ["Сплит! Удачи с двумя руками.", "Разделили, теперь играем вдвойне."]
+    }},
+    {"name": "Нина", "emoji": "👩‍💼", "phrases": {
+        "start": ["Приятной игры!", "Ставки, пожалуйста.", "Да начнётся игра!"],
+        "blackjack": ["Блэкджек! Великолепно!", "Идеально! Блэкджек!"],
+        "bust": ["Перебор. Увы.", "Слишком много, проигрыш."],
+        "win": ["Ваш выигрыш, поздравляю!", "Вы сегодня в ударе!"],
+        "push": ["Ничья. Никто не выиграл.", "Поровну."],
+        "lose": ["Дилер выигрывает.", "Не расстраивайтесь, повезёт в другой раз."],
+        "split": ["Сплит! Интересное решение.", "Две руки — двойной азарт."]
+    }},
+    {"name": "Джесси", "emoji": "👩‍🦰", "phrases": {
+        "start": ["Погнали!", "Ставки на стол!", "Удачи, господа!"],
+        "blackjack": ["Блэкджек! Просто бомба!", "Натуральная двадцать одно!"],
+        "bust": ["Ой, перебор. Сочувствую.", "Многовато, приятель."],
+        "win": ["Ваша взяла! Круто!", "Поздравляю с победой!"],
+        "push": ["Ничья, бывает.", "Остаёмся при своих."],
+        "lose": ["Дилер выиграл. Не повезло.", "Моя взяла!"],
+        "split": ["Сплит! Давайте удвоим!", "Разделили карты, теперь интереснее."]
+    }},
+    {"name": "Рамзес", "emoji": "👨‍🦳", "phrases": {
+        "start": ["Приступим.", "Ставки приняты.", "Играем."],
+        "blackjack": ["Блэкджек. Поздравляю.", "Двадцать одно. Заслуженно."],
+        "bust": ["Перебор. Проигрыш.", "Слишком много."],
+        "win": ["Вы выиграли. Поздравляю.", "Ваша победа."],
+        "push": ["Ничья.", "Равный счёт."],
+        "lose": ["Дилер победил.", "В этот раз удача не на вашей стороне."],
+        "split": ["Сплит. Хороший ход.", "Разделяем."]
+    }},
+    {"name": "Ева", "emoji": "👩", "phrases": {
+        "start": ["Удачи за столом!", "Ставки сделаны.", "Начинаем!"],
+        "blackjack": ["Блэкджек! Браво!", "Двадцать одно! Отлично!"],
+        "bust": ["Перебор. Увы.", "Не повезло."],
+        "win": ["Ваш выигрыш! Поздравляю!", "Победа!"],
+        "push": ["Ничья.", "Поровну, бывает."],
+        "lose": ["Дилер выигрывает.", "Крупье забирает."],
+        "split": ["Сплит! Удваиваем.", "Разделили, играем дальше."]
+    }}
 ]
 
 def dealer_say(game, event):
-    """Возвращает случайную фразу дилера для события."""
     dealer = game.get('dealer')
     if not dealer or event not in dealer['phrases']:
         return ""
     return random.choice(dealer['phrases'][event])
 
 def dealer_prefix(game):
-    """Возвращает префикс с именем и эмодзи дилера."""
     d = game.get('dealer')
     if d:
         return f"{d['emoji']} {d['name']}: "
@@ -160,11 +151,13 @@ async def start_lobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
          InlineKeyboardButton('100', callback_data='bj_bet_100')],
         [InlineKeyboardButton('Сесть за стол', callback_data='bj_join'),
          InlineKeyboardButton('Выйти', callback_data='bj_leave')],
-        [InlineKeyboardButton('Начать игру (1-3 игрока)', callback_data='bj_start')]
+        [InlineKeyboardButton('Начать игру (1-3 игрока)', callback_data='bj_start')],
+        [InlineKeyboardButton('🎭 Сменить дилера', callback_data='bj_dealer')]
     ]
+    d = games[chat.id]['dealer']
     msg = await context.bot.send_message(
         chat.id,
-        f"{dealer_prefix(games[chat.id])}Блэкджек стол. Выберите ставку и нажмите «Сесть за стол».",
+        f"🃏 Блэкджек стол\nДилер: {d['emoji']} {d['name']}\nВыберите ставку и нажмите «Сесть за стол».",
         reply_markup=InlineKeyboardMarkup(keyboard),
         message_thread_id=thread_id
     )
@@ -192,12 +185,14 @@ async def update_lobby_message(chat_id, context):
         InlineKeyboardButton('Выйти', callback_data='bj_leave')
     ])
     keyboard.append([InlineKeyboardButton('Начать игру (1-3 игрока)', callback_data='bj_start')])
+    keyboard.append([InlineKeyboardButton('🎭 Сменить дилера', callback_data='bj_dealer')])
 
+    d = game.get('dealer', {})
     try:
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=game['message_id'],
-            text=f"{dealer_prefix(game)}Блэкджек стол.\n{bet_text}\nТекущие игроки: {names}",
+            text=f"🃏 Блэкджек стол\nДилер: {d.get('emoji','')} {d.get('name','')}\n{bet_text}\nТекущие игроки: {names}",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     except Exception as e:
@@ -257,6 +252,28 @@ async def lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             game['players'].remove(user.id)
             del game['names'][user.id]
             del game['bets'][user.id]
+        else:
+            await query.answer('Вы не за столом.', show_alert=False)
+    elif data == 'bj_dealer':
+        # Показать список дилеров
+        dealer_buttons = []
+        for i, dealer in enumerate(DEALERS):
+            dealer_buttons.append([InlineKeyboardButton(f"{dealer['emoji']} {dealer['name']}", callback_data=f'bj_set_dealer_{i}')])
+        dealer_buttons.append([InlineKeyboardButton('Назад', callback_data='bj_back_to_lobby')])
+        await query.edit_message_text(
+            "Выберите дилера:",
+            reply_markup=InlineKeyboardMarkup(dealer_buttons)
+        )
+        return
+    elif data.startswith('bj_set_dealer_'):
+        idx = int(data.split('_')[3])
+        if 0 <= idx < len(DEALERS):
+            game['dealer'] = DEALERS[idx]
+        await update_lobby_message(chat_id, context)
+        return
+    elif data == 'bj_back_to_lobby':
+        await update_lobby_message(chat_id, context)
+        return
     elif data == 'bj_start':
         if len(game['players']) < 1:
             await query.answer('Нужен хотя бы 1 игрок.', show_alert=True)
@@ -274,15 +291,14 @@ async def start_game(chat_id, context):
     game = games[chat_id]
     game['state'] = 'playing'
     game['deck'] = new_deck()
-    game['hands'] = {}       # user_id -> list of hands (each a list of cards)
-    game['status'] = {}      # user_id -> list of statuses per hand ('playing','stood','busted','blackjack')
-    game['current_hand'] = {}  # user_id -> int (index of current hand)
+    game['hands'] = {}
+    game['status'] = {}
+    game['current_hand'] = {}
     game['dealer_hand'] = []
     game['current_player_index'] = 0
     game['turn_message_id'] = None
     game['turn_timer'] = None
 
-    # Раздача карт
     for uid in game['players']:
         hand1 = [game['deck'].pop(), game['deck'].pop()]
         game['hands'][uid] = [hand1]
@@ -291,7 +307,6 @@ async def start_game(chat_id, context):
 
     game['dealer_hand'] = [game['deck'].pop(), game['deck'].pop()]
 
-    # Сообщение в чат о начале игры
     dealer = game.get('dealer')
     thread_id = game.get('thread_id')
     dealer_msg = dealer_say(game, 'start')
@@ -305,7 +320,6 @@ async def start_game(chat_id, context):
     msg = await context.bot.send_message(chat_id, msg_text, message_thread_id=thread_id)
     game['game_message_id'] = msg.message_id
 
-    # Проверка на блэкджек у игроков
     for uid in game['players']:
         hand = game['hands'][uid][0]
         if len(hand) == 2 and hand_value(hand) == 21:
@@ -623,7 +637,6 @@ async def end_game(chat_id, context):
     keyboard = [[InlineKeyboardButton('Новая игра', callback_data='bj_new_game')]]
     await context.bot.send_message(chat_id, text, reply_markup=InlineKeyboardMarkup(keyboard), message_thread_id=game.get('thread_id'))
 
-    # Удаляем игру и уведомляем о следующей в очереди
     del games[chat_id]
     next_game = pop_next_game(chat_id)
     if next_game:
@@ -640,6 +653,18 @@ async def new_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat_id in games:
         del games[chat_id]
     await query.message.reply_text('Новая игра. Напишите "блэкджек" или /bj для старта.')
+
+# --- Сброс игры ---
+async def reset_bj(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.username and update.effective_user.username.lower() == 'iamstarhead':
+        chat_id = update.effective_chat.id
+        if chat_id in games:
+            del games[chat_id]
+            await update.message.reply_text("Игра в блэкджек сброшена.")
+        else:
+            await update.message.reply_text("Нет активной игры в блэкджек.")
+    else:
+        await update.message.reply_text("Нет доступа.")
 
 # --- Запуск через текст ---
 async def text_blackjack(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -658,7 +683,7 @@ async def text_blackjack(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- Регистрация обработчиков ---
 def register_handlers(app):
-    app.add_handler(CallbackQueryHandler(lobby_button, pattern='^bj_(bet_|join|leave|start)$'))
+    app.add_handler(CallbackQueryHandler(lobby_button, pattern='^bj_(bet_|join|leave|start|dealer|set_dealer_|back_to_lobby)'))
     app.add_handler(CallbackQueryHandler(hit, pattern='^bj_hit_'))
     app.add_handler(CallbackQueryHandler(stand, pattern='^bj_stand_'))
     app.add_handler(CallbackQueryHandler(double_down, pattern='^bj_double_'))
