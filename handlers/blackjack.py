@@ -5,6 +5,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from wallet import get_balance, add_balance
 from game_manager import get_active_game
+from queue_manager import add_to_queue, pop_next_game
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,9 @@ def hand_value(hand):
 
 def hand_display(hand):
     return ' '.join(hand) + f' ({hand_value(hand)} очков)'
+
+def card_rank(card):
+    return card[:-1]
 
 # Персонажи дилера
 DEALERS = [
@@ -123,25 +127,28 @@ async def start_lobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
     thread_id = update.effective_message.message_thread_id if update.effective_message else None
 
     active = get_active_game(chat.id)
-    if active and active != 'Блэкджек':   # если уже идёт блэкджек, то новое лобби не создаём (можно разрешить пересоздавать, но лучше запретить, чтобы не плодить столы)
+    if active:
+        keyboard = [
+            [InlineKeyboardButton('Да', callback_data='queue_blackjack')],
+            [InlineKeyboardButton('Нет', callback_data='queue_cancel')]
+        ]
         await context.bot.send_message(
             chat.id,
-            f"В этом чате уже идёт игра «{active}». Дождитесь её завершения или используйте команду сброса.",
+            f"Сейчас идёт игра «{active}». Хотите занять очередь на блэкджек?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
             message_thread_id=thread_id
         )
         return
 
-    # ... остальной код
-
     games[chat.id] = {
         'players': [],
         'names': {},
-        'bets': {},        # user_id -> int (ставка)
-        'bet_amounts': set(),   # разрешённые ставки
+        'bets': {},
+        'bet_amount': 0,
         'state': 'lobby',
         'message_id': None,
         'thread_id': thread_id,
-        'dealer': random.choice(DEALERS)   # случайный дилер при старте лобби
+        'dealer': random.choice(DEALERS)
     }
 
     keyboard = [
@@ -170,7 +177,6 @@ async def update_lobby_message(chat_id, context):
         names_parts.append(f'@{game["names"][uid]} ({bal} фишек)')
     names = ', '.join(names_parts) if names_parts else '—'
 
-    # Клавиатура: кнопки ставок видны, только если ставка ещё не выбрана (bet_amount == 0)
     keyboard = []
     if game.get('bet_amount', 0) == 0:
         keyboard.append([
@@ -199,13 +205,23 @@ async def lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     chat_id = query.message.chat.id
+    data = query.data
+
+    # Обработка кнопок очереди
+    if data == 'queue_blackjack':
+        success, msg = add_to_queue(chat_id, 'блэкджек', bet=10, player_id=query.from_user.id)
+        await query.edit_message_text(msg)
+        return
+    elif data == 'queue_cancel':
+        await query.edit_message_text("Ок, ожидайте.")
+        return
+
     game = games.get(chat_id)
     if not game or game['state'] != 'lobby':
         await query.edit_message_text('Стол уже неактуален.')
         return
 
     user = query.from_user
-    data = query.data
 
     if data.startswith('bj_bet_'):
         bet = int(data.split('_')[2])
@@ -294,7 +310,6 @@ async def start_game(chat_id, context):
                 f"{dealer_prefix(game)}@{game['names'][uid]} — блэкджек!",
                 message_thread_id=thread_id
             )
-    # Проверка блэкджека у дилера (проверим позже, но не сейчас, чтобы дать игрокам взять карты)
     await next_player_turn(chat_id, context)
 
 async def next_player_turn(chat_id, context):
@@ -303,7 +318,6 @@ async def next_player_turn(chat_id, context):
     idx = game.get('current_player_index', 0)
     while idx < len(players):
         uid = players[idx]
-        # Если у игрока несколько рук, нужно проверить, все ли сыграны
         hands = game['hands'][uid]
         statuses = game['status'][uid]
         current_hand_idx = game['current_hand'].get(uid, 0)
@@ -312,33 +326,22 @@ async def next_player_turn(chat_id, context):
             game['current_player_index'] = idx
             await send_turn_message(chat_id, uid, context)
             return
-        elif current_hand_idx < len(hands) and statuses[current_hand_idx] in ('blackjack', 'stood', 'busted'):
-            # Эта рука завершена, переходим к следующей
+        elif current_hand_idx < len(hands) and statuses[current_hand_idx] in ('blackjack', 'stood', 'busted', 'surrender'):
             game['current_hand'][uid] += 1
-            # Проверим следующую руку для этого же игрока
             if game['current_hand'][uid] < len(hands):
-                continue  # та же итерация внешнего цикла? Нет, нужно обработать следующую руку этого же игрока, не переходя к другому
-                # Поэтому мы рекурсивно вызовем next_player_turn после смены руки? Проще: здесь же проверим новую руку.
-                # Используем continue, чтобы while idx не увеличился, и мы снова проверим того же игрока.
-                # Но мы уже увеличили current_hand, поэтому в следующей итерации попадём на эту же проверку.
                 continue
             else:
-                # все руки игрока завершены
                 game['current_player_index'] += 1
                 idx = game['current_player_index']
                 continue
         else:
-            # статус не playing (например, уже stood/busted/blackjack) — переходим к следующему
-            # но если это была последняя рука, то current_hand выйдет за пределы, и мы перейдём к след. игроку
             if current_hand_idx >= len(hands):
                 game['current_player_index'] += 1
                 idx = game['current_player_index']
                 continue
             else:
-                # такой ситуации не должно быть, но на всякий случай перейдём к след. руке
                 game['current_hand'][uid] += 1
                 continue
-    # Все игроки отыграли, ход дилера
     await dealer_turn(chat_id, context)
 
 async def send_turn_message(chat_id, user_id, context):
@@ -346,32 +349,24 @@ async def send_turn_message(chat_id, user_id, context):
     hand_idx = game['current_hand'][user_id]
     hand = game['hands'][user_id][hand_idx]
     name = game['names'][user_id]
-    dealer = game.get('dealer')
-    thread_id = game.get('thread_id')
-
     total = hand_value(hand)
 
-    # Кнопки
     keyboard = []
     if total < 21:
         keyboard.append([InlineKeyboardButton('Взять', callback_data=f'bj_hit_{user_id}'),
                          InlineKeyboardButton('Хватит', callback_data=f'bj_stand_{user_id}')])
-        # Удвоение доступно, если ровно 2 карты и баланс >= ставка (текущей руки)
         if len(hand) == 2 and get_balance(user_id) >= game['bets'][user_id]:
             keyboard.append([InlineKeyboardButton('Удвоить (+ставка)', callback_data=f'bj_double_{user_id}')])
-        # Сплит доступен, если 2 карты, одного достоинства, и это первая рука (нет других рук) и баланс >= ставка
-        if len(hand) == 2 and card_rank(hand[0][:-1]) == card_rank(hand[1][:-1]) and len(game['hands'][user_id]) == 1 and get_balance(user_id) >= game['bets'][user_id]:
+        if len(hand) == 2 and card_rank(hand[0]) == card_rank(hand[1]) and len(game['hands'][user_id]) == 1 and get_balance(user_id) >= game['bets'][user_id]:
             keyboard.append([InlineKeyboardButton('Сплит', callback_data=f'bj_split_{user_id}')])
     keyboard.append([InlineKeyboardButton('Сдаться', callback_data=f'bj_surrender_{user_id}')])
 
-    # Если у игрока несколько рук, покажем номер руки
     hand_info = f"Рука {hand_idx+1}/{len(game['hands'][user_id])}: " if len(game['hands'][user_id]) > 1 else ""
 
     text = f"{dealer_prefix(game)}Ход @{name}. {hand_info}{hand_display(hand)}. Баланс: {get_balance(user_id)} фишек."
-    msg = await context.bot.send_message(chat_id, text, reply_markup=InlineKeyboardMarkup(keyboard), message_thread_id=thread_id)
+    msg = await context.bot.send_message(chat_id, text, reply_markup=InlineKeyboardMarkup(keyboard), message_thread_id=game.get('thread_id'))
     game['turn_message_id'] = msg.message_id
 
-    # Таймер авто-хода
     if game.get('turn_timer'):
         game['turn_timer'].cancel()
     game['turn_timer'] = asyncio.create_task(auto_stand(chat_id, user_id, context))
@@ -413,7 +408,6 @@ async def hit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if total == 21:
         game['status'][user_id][hand_idx] = 'stood'
         await context.bot.send_message(chat_id, f"{dealer_prefix(game)}@{name} берёт {card} — {total} очков. Автоматическая остановка.")
-        # Переход к следующей руке или игроку
         await finish_current_hand(chat_id, user_id, context)
     elif total > 21:
         game['status'][user_id][hand_idx] = 'busted'
@@ -477,8 +471,7 @@ async def double_down(update: Update, context: ContextTypes.DEFAULT_TYPE):
         game['turn_timer'].cancel()
 
     add_balance(user_id, -game['bets'][user_id])
-    game['bets'][user_id] += game['bets'][user_id]   # удваиваем ставку текущей руки (просто удваиваем число, т.к. ставка общая на игрока пока)
-    # Но если несколько рук, лучше хранить отдельные ставки. Пока упростим: ставка одна на игрока. Для сплита потом надо будет массив.
+    game['bets'][user_id] += game['bets'][user_id]
     name = game['names'][user_id]
     await query.message.delete()
     card = game['deck'].pop()
@@ -507,7 +500,6 @@ async def split(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if game.get('turn_timer'):
         game['turn_timer'].cancel()
 
-    # Сплит возможен только если одна рука и две карты одного достоинства
     hands = game['hands'][user_id]
     if len(hands) != 1 or len(hands[0]) != 2 or card_value(hands[0][0]) != card_value(hands[0][1]):
         await query.answer('Сплит невозможен.', show_alert=True)
@@ -516,20 +508,16 @@ async def split(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer('Недостаточно фишек для сплита.', show_alert=True)
         return
 
-    # Списываем дополнительную ставку
     add_balance(user_id, -game['bets'][user_id])
-    # Разделяем карты
     card1, card2 = hands[0]
     hand1 = [card1, game['deck'].pop()]
     hand2 = [card2, game['deck'].pop()]
     game['hands'][user_id] = [hand1, hand2]
     game['status'][user_id] = ['playing', 'playing']
     game['current_hand'][user_id] = 0
-    # Для простоты ставка удваивается и применяется к обеим рукам одинаково (в дальнейшем можно хранить массив ставок)
-    game['bets'][user_id] *= 2   # теперь общая ставка удвоена, но по сути каждая рука имеет половину. Упростим: payout потом разделим на 2.
+    game['bets'][user_id] *= 2
     await query.message.delete()
     await context.bot.send_message(chat_id, f"{dealer_prefix(game)}@{game['names'][user_id]} делает сплит! Теперь две руки.")
-    # Отправляем сообщение для первой руки
     await send_turn_message(chat_id, user_id, context)
 
 async def surrender(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -555,23 +543,18 @@ async def surrender(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await finish_current_hand(chat_id, user_id, context)
 
 async def finish_current_hand(chat_id, user_id, context):
-    """После завершения текущей руки переходит к следующей руке или игроку."""
     game = games[chat_id]
     hand_idx = game['current_hand'][user_id]
     hands = game['hands'][user_id]
-    # Переходим к следующей руке
     game['current_hand'][user_id] += 1
-    # Если остались ещё руки, сразу начинаем ход для следующей руки (не меняя current_player_index)
     if game['current_hand'][user_id] < len(hands):
         await send_turn_message(chat_id, user_id, context)
     else:
-        # Все руки игрока завершены, удаляем turn_message если осталось
         if game.get('turn_message_id'):
             try:
                 await context.bot.delete_message(chat_id, game['turn_message_id'])
             except:
                 pass
-        # Переходим к следующему игроку
         game['current_player_index'] += 1
         await next_player_turn(chat_id, context)
 
@@ -604,12 +587,11 @@ async def end_game(chat_id, context):
         name = game['names'][uid]
         hands = game['hands'][uid]
         statuses = game['status'][uid]
-        # Рассчитываем общую ставку на игрока (в случае сплита bet_total / количество рук)
         total_bet = game['bets'][uid]
         num_hands = len(hands)
         for i, hand in enumerate(hands):
             stat = statuses[i]
-            bet_per_hand = total_bet // num_hands if num_hands > 1 else total_bet   # упрощение
+            bet_per_hand = total_bet // num_hands if num_hands > 1 else total_bet
             if stat == 'busted':
                 results.append(f'@{name}: перебор (рука {i+1}), потеря {bet_per_hand} фишек.')
             elif stat == 'surrender':
@@ -627,23 +609,24 @@ async def end_game(chat_id, context):
                 elif total < dealer_total:
                     results.append(f'@{name}: {total} (рука {i+1}) — поражение, потеря {bet_per_hand} фишек.')
                 else:
-                    # ничья
-                    add_balance(uid, bet_per_hand)  # возврат ставки
+                    add_balance(uid, bet_per_hand)
                     results.append(f'@{name}: {total} (рука {i+1}) — ничья, возврат {bet_per_hand} фишек.')
-    # Проверка блэкджека дилера (если дилер имеет блэкджек, сравнить с игроками)
-    # Для простоты пока не реализую страховку, но блэкджек дилера можно проверить и скорректировать выплаты.
-    # Здесь можно добавить логику: если у дилера блэкджек, то все не-блэкджеки проигрывают, блэкджеки — ничья.
-    dealer_blackjack = len(game['dealer_hand']) == 2 and hand_value(game['dealer_hand']) == 21
-    if dealer_blackjack:
-        # Пересчитываем результаты: блэкджеки игроков остаются при своих (ничья), остальные проигрывают.
-        # Для простоты оставим как есть, т.к. выплаты уже сделаны, а это редкая ситуация.
-        pass
 
     dealer_display = hand_display(game['dealer_hand'])
     text = f"{dealer_prefix(game)}🏆 Результаты:\n" + '\n'.join(results)
     text += f'\nДилер: {dealer_display}'
     keyboard = [[InlineKeyboardButton('Новая игра', callback_data='bj_new_game')]]
     await context.bot.send_message(chat_id, text, reply_markup=InlineKeyboardMarkup(keyboard), message_thread_id=game.get('thread_id'))
+
+    # Удаляем игру и уведомляем о следующей в очереди
+    del games[chat_id]
+    next_game = pop_next_game(chat_id)
+    if next_game:
+        await context.bot.send_message(
+            chat_id,
+            f"Очередь подошла! Запускаем {next_game['game']}. Напишите /bj или используйте кнопку меню.",
+            message_thread_id=game.get('thread_id')
+        )
 
 async def new_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
