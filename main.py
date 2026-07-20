@@ -3,7 +3,7 @@ import time
 import threading
 import logging
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -22,11 +22,6 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
-
-async def queue_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    queue_text = get_queue(chat_id)
-    await update.message.reply_text(f"Текущая очередь:\n{queue_text}")
 
 async def log_update(update: Update, context):
     if update.message and update.message.text:
@@ -82,16 +77,16 @@ async def transfer_command(update: Update, context):
     else:
         await update.message.reply_text("Недостаточно средств.")
 
-async def durak_command(update: Update, context):
-    keyboard = [
-        [InlineKeyboardButton("Подкидной", callback_data="durak_mode_throw")],
-        [InlineKeyboardButton("Переводной", callback_data="durak_mode_transfer")],
-        [InlineKeyboardButton("Простой", callback_data="durak_mode_simple")],
-    ]
-    await update.message.reply_text(
-        "Выберите режим дурака:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+async def queue_command(update: Update, context):
+    chat_id = update.effective_chat.id
+    queue_text = get_queue(chat_id)
+    await update.message.reply_text(f"Текущая очередь:\n{queue_text}")
+
+async def stop_durak(update: Update, context):
+    await durak.reset_durak(update, context)
+
+async def stop_blackjack(update: Update, context):
+    await blackjack.reset_bj(update, context)
 
 def run_bot():
     token = os.environ["BOT_TOKEN"]
@@ -102,53 +97,47 @@ def run_bot():
 
     blackjack.register_handlers(app)
     app.add_handler(CommandHandler("bj", blackjack.start_lobby))
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & filters.Regex(r"(?i)^(блэкджек|blackjack|21|очко)$"),
-            blackjack.text_blackjack,
-        )
-    )
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex(r"(?i)^(блэкджек|blackjack|21|очко)$"),
+        blackjack.text_blackjack
+    ))
 
     durak.register_handlers(app)
-    app.add_handler(CommandHandler("durak", durak_command))
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & filters.Regex(r"(?i)^дурак"),
-            durak.text_durak
-        )
-    )
+    app.add_handler(CommandHandler("durak", lambda u, c: durak.durak_start(u, c, 'throw')))
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex(r"(?i)^дурак"),
+        durak.text_durak
+    ))
 
     slots.register_handlers(app)
     app.add_handler(CommandHandler("slots", slots.start_slots))
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & filters.Regex(r"(?i)^(слоты|слот|автомат)$"),
-            slots.start_slots
-        )
-    )
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex(r"(?i)^(слоты|слот|автомат)$"),
+        slots.start_slots
+    ))
+
+    # Стоп-команды
+    app.add_handler(CommandHandler("reset_bj", blackjack.reset_bj))
+    app.add_handler(CommandHandler("reset_durak", durak.reset_durak))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^(дурак стоп)$"), stop_durak))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^(блэкджек стоп)$"), stop_blackjack))
+
+    # Очередь
+    app.add_handler(CommandHandler("queue", queue_command))
 
     app.add_handler(CommandHandler("balance", balance_command))
     app.add_handler(CommandHandler("transfer", transfer_command))
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & filters.Regex(r"(?i)^баланс$"),
-            balance_command
-        )
-    )
-    
-    app.add_handler(CommandHandler("queue", queue_command))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^баланс$"), balance_command))
+
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", button_handler))
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT
-            & filters.Regex(r"(?i)^(привет|здравствуй|хай|здарова|hello)$"),
-            hello_handler,
-        )
-    )
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex(r"(?i)^(привет|здравствуй|хай|здарова|hello)$"),
+        hello_handler
+    ))
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    logger.info("Ожидаю 5 секунд, чтобы старый инстанс освободил обновления...")
+    logger.info("Ожидаю 5 секунд...")
     time.sleep(5)
     logger.info("Запускаю бота...")
     app.run_polling()
