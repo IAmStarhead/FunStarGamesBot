@@ -5,7 +5,6 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 from wallet import get_balance, add_balance
-from game_manager import get_active_game
 from queue_manager import add_to_queue, pop_next_game
 from handlers import slots
 
@@ -60,17 +59,29 @@ async def durak_start(update: Update, context: ContextTypes.DEFAULT_TYPE, mode='
     chat = update.effective_chat
     thread_id = update.effective_message.message_thread_id if update.effective_message else None
 
-    active = get_active_game(chat.id)
-    if active:
-        keyboard = [
-            [InlineKeyboardButton('Да (очередь)', callback_data='queue_durak')],
-            [InlineKeyboardButton('Нет', callback_data='queue_cancel')],
-            [InlineKeyboardButton('Слоты 🎰', callback_data='queue_play_slots')]
-        ]
+    # Проверка, не занят ли чат блэкджеком
+    try:
+        from handlers.blackjack import games as bj_games
+        if chat.id in bj_games and bj_games[chat.id].get('state') != 'finished':
+            keyboard = [
+                [InlineKeyboardButton('Да (очередь)', callback_data='queue_durak')],
+                [InlineKeyboardButton('Нет', callback_data='queue_cancel')],
+                [InlineKeyboardButton('Слоты 🎰', callback_data='queue_play_slots')]
+            ]
+            await context.bot.send_message(
+                chat.id,
+                f"Сейчас идёт игра «Блэкджек». Хотите занять очередь на дурака? А пока можете испытать удачу в слотах!",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                message_thread_id=thread_id
+            )
+            return
+    except ImportError:
+        pass
+
+    if chat.id in durak_games and durak_games[chat.id]['state'] != 'finished':
         await context.bot.send_message(
             chat.id,
-            f"Сейчас идёт игра «{active}». Хотите занять очередь на дурака? А пока можете испытать удачу в слотах!",
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            'Игра в дурака уже идёт. Дождитесь завершения.',
             message_thread_id=thread_id
         )
         return
