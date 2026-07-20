@@ -7,6 +7,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 from wallet import get_balance, add_balance
 from game_manager import get_active_game
 from queue_manager import add_to_queue, pop_next_game, get_queue
+from handlers import slots
 
 logger = logging.getLogger(__name__)
 
@@ -62,12 +63,13 @@ async def durak_start(update: Update, context: ContextTypes.DEFAULT_TYPE, mode='
     active = get_active_game(chat.id)
     if active:
         keyboard = [
-            [InlineKeyboardButton('Да', callback_data='queue_durak')],
-            [InlineKeyboardButton('Нет', callback_data='queue_cancel')]
+            [InlineKeyboardButton('Да (очередь)', callback_data='queue_durak')],
+            [InlineKeyboardButton('Нет', callback_data='queue_cancel')],
+            [InlineKeyboardButton('Слоты 🎰', callback_data='queue_play_slots')]
         ]
         await context.bot.send_message(
             chat.id,
-            f"Сейчас идёт игра «{active}». Хотите занять очередь на дурака ({mode})?",
+            f"Сейчас идёт игра «{active}». Хотите занять очередь на дурака? А пока можете испытать удачу в слотах!",
             reply_markup=InlineKeyboardMarkup(keyboard),
             message_thread_id=thread_id
         )
@@ -147,14 +149,12 @@ async def durak_lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
         success, msg = add_to_queue(chat_id, 'дурак', mode='throw', bet=25, player_id=query.from_user.id)
         await query.edit_message_text(msg)
         return
-    elif data == 'queue_cancel':
-        await query.edit_message_text("Ок, ожидайте.")
-        return
-
-    game = durak_games.get(chat_id)
-    if not game or game['state'] != 'lobby':
-        await query.edit_message_text('Лобби устарело.')
-        return
+elif data == 'queue_cancel':
+    await query.edit_message_text("Ок, ожидайте.")
+    return
+elif data == 'queue_play_slots':
+    await slots.start_slots(update, context)
+    return
 
     user = query.from_user
 
