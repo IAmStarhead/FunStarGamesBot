@@ -6,6 +6,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 from wallet import get_balance, add_balance
 from game_manager import get_active_game
 from queue_manager import add_to_queue, pop_next_game
+from handlers import slots
 
 logger = logging.getLogger(__name__)
 
@@ -129,12 +130,13 @@ async def start_lobby(update: Update, context: ContextTypes.DEFAULT_TYPE):
     active = get_active_game(chat.id)
     if active:
         keyboard = [
-            [InlineKeyboardButton('Да', callback_data='queue_blackjack')],
-            [InlineKeyboardButton('Нет', callback_data='queue_cancel')]
+            [InlineKeyboardButton('Да (очередь)', callback_data='queue_blackjack')],
+            [InlineKeyboardButton('Нет', callback_data='queue_cancel')],
+            [InlineKeyboardButton('Слоты 🎰', callback_data='queue_play_slots')]
         ]
         await context.bot.send_message(
             chat.id,
-            f"Сейчас идёт игра «{active}». Хотите занять очередь на блэкджек?",
+            f"Сейчас идёт игра «{active}». Хотите занять очередь на блэкджек? Или попробуйте слоты!",
             reply_markup=InlineKeyboardMarkup(keyboard),
             message_thread_id=thread_id
         )
@@ -214,6 +216,9 @@ async def lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     elif data == 'queue_cancel':
         await query.edit_message_text("Ок, ожидайте.")
+        return
+    elif data == 'queue_play_slots':
+        await slots.start_slots(update, context)
         return
 
     game = games.get(chat_id)
