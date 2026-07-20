@@ -56,6 +56,7 @@ def can_beat(attacking_card, defending_card, trump):
 async def durak_start(update: Update, context: ContextTypes.DEFAULT_TYPE, mode='throw'):
     chat = update.effective_chat
     thread_id = update.effective_message.message_thread_id if update.effective_message else None
+    logger.info(f"durak_start called for chat {chat.id}, mode={mode}, thread_id={thread_id}")
 
     if chat.id in durak_games and durak_games[chat.id]['state'] != 'finished':
         await context.bot.send_message(
@@ -79,6 +80,7 @@ async def durak_start(update: Update, context: ContextTypes.DEFAULT_TYPE, mode='
         'pending_transfer': None,
         'last_action': ''
     }
+    logger.info(f"Created new game for chat {chat.id}, state='lobby'")
 
     keyboard = [
         [InlineKeyboardButton('25 фишек', callback_data='durak_bet_25'),
@@ -99,9 +101,11 @@ async def durak_start(update: Update, context: ContextTypes.DEFAULT_TYPE, mode='
         message_thread_id=thread_id
     )
     durak_games[chat.id]['message_id'] = msg.message_id
+    logger.info(f"Lobby message sent, message_id={msg.message_id}")
 
 async def update_lobby_message(chat_id, context):
     game = durak_games[chat_id]
+    logger.info(f"update_lobby_message for chat {chat_id}, game state={game['state']}, players={game['players']}")
     mode_names = {'throw': 'Подкидной', 'transfer': 'Переводной', 'simple': 'Простой'}
     bet_text = f'Ставка: {game["bet_amount"]} фишек' if game['bet_amount'] > 0 else 'Ставка не выбрана'
     names_parts = []
@@ -121,19 +125,25 @@ async def update_lobby_message(chat_id, context):
         [InlineKeyboardButton('Начать игру', callback_data='durak_start')],
         [InlineKeyboardButton('Играть с ботом (1 игрок)', callback_data='durak_play_vs_bot')]
     ]
-    await context.bot.edit_message_text(
-        chat_id=chat_id,
-        message_id=game['message_id'],
-        text=f'🃏 Дурак ({mode_names[game["mode"]]})\n{bet_text}\nТекущие игроки: {names}',
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    try:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=game['message_id'],
+            text=f'🃏 Дурак ({mode_names[game["mode"]]})\n{bet_text}\nТекущие игроки: {names}',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        logger.info("Lobby message edited successfully")
+    except Exception as e:
+        logger.error(f"Failed to edit lobby message: {e}")
 
 async def durak_lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     chat_id = query.message.chat.id
     game = durak_games.get(chat_id)
+    logger.info(f"durak_lobby_button called, data={query.data}, chat_id={chat_id}, user={query.from_user.id}, game exists={game is not None}")
     if not game or game['state'] != 'lobby':
+        logger.warning(f"Lobby stale: game={game is not None}, state={game['state'] if game else 'N/A'}")
         await query.edit_message_text('Лобби устарело.')
         return
 
@@ -143,10 +153,12 @@ async def durak_lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if data.startswith('durak_bet_'):
         bet = int(data.split('_')[2])
         game['bet_amount'] = bet
+        logger.info(f"Bet set to {bet}")
         await query.answer(f'Ставка: {bet} фишек.')
         await update_lobby_message(chat_id, context)
         return
     elif data == 'durak_join':
+        logger.info("Processing durak_join")
         if not is_activated(user.id):
             await query.answer('Сначала напишите боту в личные сообщения (откройте чат и нажмите /start).', show_alert=True)
             return
@@ -166,12 +178,14 @@ async def durak_lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
         game['players'].append(user.id)
         game['names'][user.id] = user.first_name
         game['bets'][user.id] = game['bet_amount']
+        logger.info(f"Player {user.id} joined, players now: {game['players']}")
     elif data == 'durak_leave':
         if user.id in game['players']:
             add_balance(user.id, game['bets'][user.id])
             game['players'].remove(user.id)
             del game['names'][user.id]
             del game['bets'][user.id]
+            logger.info(f"Player {user.id} left")
     elif data == 'durak_start':
         if len(game['players']) < 2:
             await query.answer('Нужно хотя бы 2 игрока.', show_alert=True)
@@ -179,6 +193,7 @@ async def durak_lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if game['bet_amount'] == 0:
             await query.answer('Сначала выберите ставку.', show_alert=True)
             return
+        logger.info("Starting game from lobby")
         await start_durak_game(chat_id, context)
         return
     elif data == 'durak_play_vs_bot':
@@ -193,6 +208,7 @@ async def durak_lobby_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
         game['names'][bot_id] = 'Бот'
         game['bets'][bot_id] = 0
         game['vs_bot'] = True
+        logger.info("Starting game vs bot")
         await start_durak_game(chat_id, context)
         return
 
